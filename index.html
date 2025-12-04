@@ -1,1 +1,739 @@
-123
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Learning Shooter - School Edition (Head Aim + Hand Gesture)</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Noto Sans TC', sans-serif; user-select: none; }
+        #ui-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
+            z-index: 5;
+        }
+        #hud-top {
+            display: flex; justify-content: space-between; padding: 20px;
+            color: white; text-shadow: 2px 2px 0 #000; font-size: 24px; font-weight: bold;
+        }
+        #hud-bottom {
+            padding: 20px; color: white; text-shadow: 1px 1px 0 #000; font-size: 18px;
+            text-align: center;
+        }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%;
+            width: 20px; height: 20px;
+            background: transparent;
+            border: 2px solid rgba(0, 255, 0, 0.8);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+        }
+        #crosshair::after {
+            content: ''; position: absolute; top: 50%; left: 50%;
+            width: 4px; height: 4px; background: red;
+            transform: translate(-50%, -50%); border-radius: 50%;
+        }
+        #start-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; pointer-events: auto; z-index: 10;
+        }
+        button {
+            padding: 15px 30px; font-size: 24px; cursor: pointer;
+            background: #4CAF50; color: white; border: none; border-radius: 5px;
+            margin-top: 20px;
+        }
+        button:hover { background: #45a049; }
+        button:disabled { background: #666; cursor: not-allowed; }
+        .message {
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            color: #ffeb3b; font-size: 32px; font-weight: bold; text-shadow: 2px 2px 4px #000;
+            opacity: 0; transition: opacity 0.5s;
+        }
+        #damage-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: red; opacity: 0; pointer-events: none; transition: opacity 0.1s;
+            z-index: 4;
+        }
+        .bar-container {
+            width: 200px; height: 20px; background: #333; border: 2px solid white; margin-bottom: 5px;
+        }
+        #hp-bar { width: 100%; height: 100%; background: #f44336; transition: width 0.2s; }
+        
+        /* Loading Text */
+        #loading { font-size: 20px; color: #aaa; margin-top: 10px; }
+
+        /* MediaPipe Debug View */
+        #mediapipe-container {
+            position: absolute; bottom: 20px; right: 20px;
+            width: 320px; height: 240px;
+            border: 2px solid white; background: black;
+            z-index: 6; transform: scaleX(-1); /* 鏡像顯示 */
+        }
+        #input_video { display: none; }
+        #output_canvas { width: 100%; height: 100%; }
+        
+        .instruction-overlay {
+            position: absolute; top: 50%; left: 20px; transform: translateY(-50%);
+            color: rgba(255, 255, 255, 0.7); font-size: 14px; pointer-events: none;
+            text-align: left;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+    <!-- Import Map to resolve 'three' dependency -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <!-- MediaPipe Libraries (Switch to Holistic) -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <!-- UI Overlay -->
+    <div id="damage-overlay"></div>
+    <div id="ui-container">
+        <div id="hud-top">
+            <div>
+                <div class="bar-container"><div id="hp-bar"></div></div>
+                <div>HP: <span id="hp-text">100</span></div>
+            </div>
+            <div>樓層: <span id="floor-text">1</span>F | 分數: <span id="score-text">0</span></div>
+        </div>
+        <div id="message-area" class="message"></div>
+        <div id="hud-bottom">
+            <div>狀態: <span id="buff-text" style="color:#00ff00;">無</span></div>
+            <div style="font-size: 14px; color: #ccc;">頭部轉動瞄準 | 左手手指指向移動 | 右手捏合射擊</div>
+        </div>
+        <!-- [修改] 移除了左移和右移的操作說明 -->
+        <div class="instruction-overlay">
+            <p>🙂 <b>頭部 (瞄準)</b></p>
+            <p>頭部轉向/移動: 控制準心</p>
+            <p>保持頭部在中央十字: 停止旋轉</p>
+            <br>
+            <p>🖐️ <b>左手 (移動)</b></p>
+            <p>☝️ 手指指向上: 前進</p>
+            <p>👇 手指指向下: 後退</p>
+            <br>
+            <p>🖐️ <b>右手 (攻擊)</b></p>
+            <p>👌 捏合: 射擊</p>
+        </div>
+    </div>
+    <div id="crosshair"></div>
+
+    <!-- MediaPipe Container -->
+    <div id="mediapipe-container">
+        <video id="input_video"></video>
+        <canvas id="output_canvas"></canvas>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen">
+        <h1>善用 AI 學習 - 體感操控版</h1>
+        <p>模式：頭部瞄準 + 手勢指向移動</p>
+        <p>消滅「錯誤 AI 習慣」怪物，收集「正確 AI 學習」寶箱</p>
+        <p>共 3 層樓，每層 5 間教室</p>
+        <div id="loading">載入神經網絡模型中... (請稍候)</div>
+        <button id="start-btn" style="display:none;">開啟攝影機並開始</button>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- 遊戲常數與變數 ---
+        const FLOOR_HEIGHT = 15;
+        const ROOM_SIZE = 20;
+        const HALLWAY_WIDTH = 10;
+        const HALLWAY_LENGTH = 120;
+        
+        const BAD_HABITS = ["直接抄襲", "不做查證", "洩露隱私", "停止思考", "盲目相信", "過度依賴", "忽視版權"];
+        const GOOD_HABITS = [
+            ["輔助思考", "speed", "#00ffff"], ["檢查來源", "damage", "#ff00ff"],
+            ["優化語法", "heal", "#00ff00"], ["激發創意", "invincible", "#ffd700"],
+            ["解釋代碼", "heal", "#00ff00"]
+        ];
+
+        let camera, scene, renderer;
+        
+        // 操控變數
+        let handMoveForward = false, handMoveBackward = false, handMoveLeft = false, handMoveRight = false;
+        let headLookYaw = 0;   // 頭部控制左右
+        let headLookPitch = 0; // 頭部控制上下
+        let isPinching = false;
+        let wasPinching = false;
+        
+        let prevTime = performance.now();
+        let isGameOver = false; 
+        let isGameActive = false; 
+        
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+        
+        const bullets = [];
+        const enemies = [];
+        const chests = [];
+        const collidableMeshList = []; 
+        
+        const player = {
+            hp: 100, maxHp: 100, score: 0,
+            speedMultiplier: 1.0, damageMultiplier: 1.0,
+            isInvincible: false, currentFloor: 1, height: 1.6
+        };
+
+        // --- MediaPipe Holistic 初始化 ---
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        let cameraUtils = null;
+
+        function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            // [新增] 繪製中心十字線 (輔助瞄準)
+            const w = canvasElement.width;
+            const h = canvasElement.height;
+            canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; // 半透明白色
+            canvasCtx.lineWidth = 1;
+            
+            // 垂直線
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(w / 2, 0);
+            canvasCtx.lineTo(w / 2, h);
+            canvasCtx.stroke();
+
+            // 水平線
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(0, h / 2);
+            canvasCtx.lineTo(w, h / 2);
+            canvasCtx.stroke();
+
+            // 重置輸入
+            handMoveForward = false; handMoveBackward = false;
+            handMoveLeft = false; handMoveRight = false;
+            headLookYaw = 0; headLookPitch = 0;
+            isPinching = false;
+
+            // 1. 頭部追蹤 (Face Landmarks)
+            if (results.faceLandmarks) {
+                const nose = results.faceLandmarks[1]; // 鼻尖
+                
+                // 繪製鼻尖
+                const nx = nose.x * canvasElement.width;
+                const ny = nose.y * canvasElement.height;
+                canvasCtx.beginPath();
+                canvasCtx.arc(nx, ny, 5, 0, 2 * Math.PI);
+                canvasCtx.fillStyle = "yellow";
+                canvasCtx.fill();
+
+                // 頭部控制邏輯 (Deadzone 0.05, Low Sensitivity)
+                const deadzone = 0.05;
+                
+                // 左右 (Yaw) - 靈敏度 1.2
+                if (nose.x < 0.5 - deadzone) headLookYaw = 1.2 * (0.5 - deadzone - nose.x) * 10; 
+                else if (nose.x > 0.5 + deadzone) headLookYaw = -1.2 * (nose.x - 0.5 - deadzone) * 10;
+                
+                // 上下 (Pitch) - 靈敏度 0.4, 反向
+                if (nose.y < 0.5 - deadzone) headLookPitch = -0.4 * (0.5 - deadzone - nose.y) * 10; 
+                else if (nose.y > 0.5 + deadzone) headLookPitch = 0.4 * (nose.y - 0.5 - deadzone) * 10; 
+            }
+
+            // 2. 左手 (移動) - 改為手指指向
+            if (results.leftHandLandmarks) {
+                drawConnectors(canvasCtx, results.leftHandLandmarks, HAND_CONNECTIONS, {color: '#FFFFFF', lineWidth: 2});
+                drawLandmarks(canvasCtx, results.leftHandLandmarks, {color: '#00FF00', lineWidth: 1});
+
+                const wrist = results.leftHandLandmarks[0];
+                const indexTip = results.leftHandLandmarks[8]; // 食指指尖
+                
+                // 計算手指相對於手腕的向量
+                const dx = indexTip.x - wrist.x;
+                const dy = indexTip.y - wrist.y;
+                
+                // 設定觸發閾值 (長度)
+                const threshold = 0.05; // 如果手指伸出超過這個距離才算
+                
+                // 判斷主要方向 (水平還是垂直)
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    // 水平移動為主
+                    // 注意：因為我們禁用了左右移動，這裡不需要設置 handMoveLeft/Right
+                    // 但為了代碼完整性或未來擴充，可以保留變數設定，但在 animate 中忽略
+                    // 或者直接什麼都不做。這裡我們只關注垂直。
+                    
+                    // if (dx > threshold) handMoveLeft = true;
+                    // else if (dx < -threshold) handMoveRight = true;
+                } else {
+                    // 垂直移動為主
+                    // y=0 是上面
+                    if (dy < -threshold) handMoveForward = true; // 指向上 (y變小)
+                    else if (dy > threshold) handMoveBackward = true; // 指向下 (y變大)
+                }
+            }
+
+            // 3. 右手 (射擊)
+            if (results.rightHandLandmarks) {
+                drawConnectors(canvasCtx, results.rightHandLandmarks, HAND_CONNECTIONS, {color: '#FFFFFF', lineWidth: 2});
+                drawLandmarks(canvasCtx, results.rightHandLandmarks, {color: '#FF0000', lineWidth: 1});
+
+                const indexTip = results.rightHandLandmarks[8];
+                const thumbTip = results.rightHandLandmarks[4];
+                const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+                if (distance < 0.05) {
+                    isPinching = true;
+                }
+            }
+
+            canvasCtx.restore();
+        }
+
+        const holistic = new Holistic({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`;
+        }});
+        holistic.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+        holistic.onResults(onResults);
+
+        // --- 初始化 ---
+        function init() {
+            const startBtn = document.getElementById('start-btn');
+            const loadingText = document.getElementById('loading');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB); 
+            scene.fog = new THREE.Fog(0x87CEEB, 10, 80);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.rotation.order = 'YXZ'; 
+            camera.position.y = player.height;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const gunGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.6);
+            const gunMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+            const gun = new THREE.Mesh(gunGeometry, gunMaterial);
+            gun.position.set(0.3, -0.3, -0.5);
+            camera.add(gun);
+            scene.add(camera);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            startBtn.addEventListener('click', () => {
+                startBtn.disabled = true;
+                startBtn.innerText = "啟動攝影機中...";
+                
+                cameraUtils = new Camera(videoElement, {
+                    onFrame: async () => {
+                        await holistic.send({image: videoElement});
+                    },
+                    width: 320,
+                    height: 240
+                });
+                cameraUtils.start().then(() => {
+                    document.getElementById('start-screen').style.display = 'none';
+                    document.getElementById('ui-container').style.display = 'flex';
+                    isGameActive = true;
+                }).catch(err => {
+                    console.error(err);
+                    alert("無法啟動攝影機: " + err);
+                    startBtn.disabled = false;
+                    startBtn.innerText = "重試";
+                });
+            });
+
+            generateSchool();
+            
+            loadingText.style.display = 'none';
+            startBtn.style.display = 'block';
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        // --- 文字紋理 ---
+        function createTextTexture(text, bgColor, textColor = 'white') {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 128; 
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = bgColor; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = 10; ctx.strokeStyle = '#ffffff'; ctx.strokeRect(0, 0, canvas.width, canvas.height);
+            ctx.font = 'bold 40px "Microsoft JhengHei", Arial';
+            ctx.fillStyle = textColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // --- 地圖生成 ---
+        function generateSchool() {
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee }); 
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63 }); 
+            const ceilingMat = new THREE.MeshStandardMaterial({ color: 0xdddddd }); 
+
+            for (let f = 0; f < 3; f++) {
+                const yOffset = f * FLOOR_HEIGHT;
+                // 走廊
+                const hallFloor = new THREE.Mesh(new THREE.PlaneGeometry(HALLWAY_WIDTH, HALLWAY_LENGTH), floorMat);
+                hallFloor.rotation.x = -Math.PI / 2; hallFloor.position.set(0, yOffset, 0);
+                scene.add(hallFloor); collidableMeshList.push(hallFloor);
+
+                const hallCeil = new THREE.Mesh(new THREE.PlaneGeometry(HALLWAY_WIDTH, HALLWAY_LENGTH), ceilingMat);
+                hallCeil.rotation.x = Math.PI / 2; hallCeil.position.set(0, yOffset + 5, 0); 
+                scene.add(hallCeil);
+
+                createHallwayWalls(yOffset, wallMat);
+
+                for(let l=0; l<3; l++) {
+                    const light = new THREE.PointLight(0xffaa00, 0.5, 30);
+                    light.position.set(0, yOffset + 4, -40 + l * 40); scene.add(light);
+                }
+
+                // 教室
+                for (let r = 0; r < 5; r++) {
+                    const side = r % 2 === 0 ? 1 : -1;
+                    const zPos = -40 + r * 20;
+                    const xPos = side * (HALLWAY_WIDTH / 2 + ROOM_SIZE / 2);
+                    
+                    const roomGeo = new THREE.PlaneGeometry(ROOM_SIZE, ROOM_SIZE);
+                    const roomFloor = new THREE.Mesh(roomGeo, floorMat);
+                    roomFloor.rotation.x = -Math.PI / 2; roomFloor.position.set(xPos, yOffset, zPos);
+                    scene.add(roomFloor); collidableMeshList.push(roomFloor);
+
+                    const roomCeil = new THREE.Mesh(roomGeo, ceilingMat);
+                    roomCeil.rotation.x = Math.PI / 2; roomCeil.position.set(xPos, yOffset + 5, zPos);
+                    scene.add(roomCeil);
+
+                    createWalls(xPos, yOffset, zPos, ROOM_SIZE, wallMat);
+                    const label = createTextLabel(`${f+1}樓-${r+1}班`, xPos, yOffset + 3, zPos); scene.add(label);
+                    spawnEntities(xPos, yOffset + 1, zPos);
+                }
+
+                if (f < 2) createTeleporter(0, yOffset, -HALLWAY_LENGTH/2 + 5, f + 2, true);
+                if (f > 0) createTeleporter(0, yOffset, HALLWAY_LENGTH/2 - 5, f, false);
+            }
+        }
+
+        function createHallwayWalls(y, material) {
+             const height = 5; const halfHeight = height / 2;
+             const endWall1 = new THREE.Mesh(new THREE.BoxGeometry(10, height, 1), material);
+             endWall1.position.set(0, y + halfHeight, -60); endWall1.userData = { isWall: true };
+             scene.add(endWall1); collidableMeshList.push(endWall1);
+             
+             const endWall2 = new THREE.Mesh(new THREE.BoxGeometry(10, height, 1), material);
+             endWall2.position.set(0, y + halfHeight, 60); endWall2.userData = { isWall: true };
+             scene.add(endWall2); collidableMeshList.push(endWall2);
+             
+             const extensionGeo = new THREE.BoxGeometry(1, height, 10);
+             [{x: -5, z: -55}, {x: 5, z: -55}, {x: -5, z: 55}, {x: 5, z: 55}].forEach(pos => {
+                 const w = new THREE.Mesh(extensionGeo, material);
+                 w.position.set(pos.x, y + halfHeight, pos.z); w.userData = { isWall: true };
+                 scene.add(w); collidableMeshList.push(w);
+             });
+
+             for (let i = 0; i < 5; i++) {
+                 const zCenter = -40 + i * 20;
+                 createSideSegment(-5, y, zCenter, (i % 2 !== 0), material);
+                 createSideSegment(5, y, zCenter, (i % 2 === 0), material);
+             }
+        }
+
+        function createSideSegment(x, y, z, hasRoom, material) {
+            const height = 5; const halfHeight = height / 2;
+            if (!hasRoom) {
+                const wall = new THREE.Mesh(new THREE.BoxGeometry(1, height, 20), material);
+                wall.position.set(x, y + halfHeight, z); wall.userData = { isWall: true };
+                scene.add(wall); collidableMeshList.push(wall);
+            } else {
+                const segmentLen = 7; const offset = 10 - (segmentLen / 2);
+                const w1 = new THREE.Mesh(new THREE.BoxGeometry(1, height, segmentLen), material);
+                w1.position.set(x, y + halfHeight, z - offset); w1.userData = { isWall: true };
+                scene.add(w1); collidableMeshList.push(w1);
+                
+                const w2 = new THREE.Mesh(new THREE.BoxGeometry(1, height, segmentLen), material);
+                w2.position.set(x, y + halfHeight, z + offset); w2.userData = { isWall: true };
+                scene.add(w2); collidableMeshList.push(w2);
+                
+                const lintel = new THREE.Mesh(new THREE.BoxGeometry(1, 1.5, 6), material);
+                lintel.position.set(x, y + height - 0.75, z); lintel.userData = { isWall: true };
+                scene.add(lintel); collidableMeshList.push(lintel);
+            }
+        }
+
+        function createWalls(x, y, z, size, material) {
+            const half = size / 2; const height = 5;
+            const backWall = new THREE.Mesh(new THREE.BoxGeometry(1, height, size), material);
+            backWall.position.set(x + (x > 0 ? half : -half), y + height/2, z); backWall.userData = { isWall: true };
+            scene.add(backWall); collidableMeshList.push(backWall);
+
+            const sideWall1 = new THREE.Mesh(new THREE.BoxGeometry(size, height, 1), material);
+            sideWall1.position.set(x, y + height/2, z - half); sideWall1.userData = { isWall: true };
+            scene.add(sideWall1); collidableMeshList.push(sideWall1);
+
+            const sideWall2 = new THREE.Mesh(new THREE.BoxGeometry(size, height, 1), material);
+            sideWall2.position.set(x, y + height/2, z + half); sideWall2.userData = { isWall: true };
+            scene.add(sideWall2); collidableMeshList.push(sideWall2);
+        }
+
+        function createTeleporter(x, y, z, targetFloor, isUp) {
+            const pad = new THREE.Mesh(new THREE.BoxGeometry(8, 0.2, 8), new THREE.MeshBasicMaterial({ color: isUp ? 0x00ff00 : 0xff0000, transparent: true, opacity: 0.5 }));
+            pad.position.set(x, y + 0.1, z);
+            pad.userData = { isTeleporter: true, targetFloor: targetFloor, isUp: isUp };
+            scene.add(pad); collidableMeshList.push(pad);
+            const label = createTextLabel(isUp ? "上樓" : "下樓", x, y+2, z, 40, "rgba(0,0,0,0)", "white"); scene.add(label);
+        }
+
+        function createTextLabel(text, x, y, z, size = 60, bg="rgba(0,0,0,0.5)", color="white") {
+            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: createTextTexture(text, bg, color) }));
+            sprite.position.set(x, y, z); sprite.scale.set(4, 2, 1); return sprite;
+        }
+
+        function spawnEntities(x, y, z) {
+            const rand = Math.random();
+            if (rand < 0.6) createEnemy(x, y, z);
+            else if (rand < 0.9) createChest(x, y, z);
+        }
+
+        function createEnemy(x, y, z) {
+            const habit = BAD_HABITS[Math.floor(Math.random() * BAD_HABITS.length)];
+            const enemy = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 1.5), new THREE.MeshStandardMaterial({ map: createTextTexture(habit, '#d32f2f') }));
+            enemy.position.set(x, y, z); scene.add(enemy);
+            enemies.push({ mesh: enemy, hp: 3, speed: (3 + Math.random() * 2) / 2, lastAttack: 0 });
+        }
+
+        function createChest(x, y, z) {
+            const [name, effect, color] = GOOD_HABITS[Math.floor(Math.random() * GOOD_HABITS.length)];
+            const chest = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ map: createTextTexture(name, color, '#000000'), metalness: 0.5, roughness: 0.1 }));
+            chest.position.set(x, y - 0.25, z); chest.userData = { type: effect, name: name };
+            scene.add(chest); chests.push(chest);
+        }
+
+        function shoot() {
+            if (!isGameActive) return;
+            const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
+            bullet.position.copy(camera.position);
+            const vector = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+            bullet.position.addScaledVector(vector, 0.5);
+            bullet.userData = { velocity: vector.multiplyScalar(40), lifetime: 2.0 };
+            scene.add(bullet); bullets.push(bullet);
+            camera.rotation.x += 0.02;
+        }
+
+        function updateBullets(delta) {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.position.addScaledVector(b.userData.velocity, delta);
+                b.userData.lifetime -= delta;
+                const bulletBox = new THREE.Box3().setFromObject(b);
+                let hit = false;
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const e = enemies[j];
+                    if (bulletBox.intersectsBox(new THREE.Box3().setFromObject(e.mesh))) {
+                        e.hp -= player.damageMultiplier;
+                        e.mesh.position.addScaledVector(b.userData.velocity.clone().normalize(), 0.5);
+                        hit = true;
+                        if (e.hp <= 0) {
+                            scene.remove(e.mesh); enemies.splice(j, 1);
+                            player.score += 100; updateHUD(); showMessage("消滅錯誤觀念!", "#4caf50");
+                        } else {
+                             e.mesh.material.color.setHex(0xffffff);
+                             setTimeout(() => e.mesh.material.color.setHex(0xffffff), 50); 
+                        }
+                        break;
+                    }
+                }
+                if (hit || b.userData.lifetime <= 0) { scene.remove(b); bullets.splice(i, 1); }
+            }
+        }
+
+        function updateEnemies(delta) {
+            const playerPos = camera.position;
+            enemies.forEach(e => {
+                const dist = e.mesh.position.distanceTo(playerPos);
+                const heightDiff = Math.abs(e.mesh.position.y - playerPos.y);
+                if (heightDiff < 5 && dist < 25 && dist > 1.0) {
+                    const oldPos = e.mesh.position.clone();
+                    e.mesh.lookAt(playerPos.x, e.mesh.position.y, playerPos.z);
+                    e.mesh.translateZ(e.speed * delta);
+                    if (checkEnemyCollision(e.mesh)) e.mesh.position.copy(oldPos);
+                }
+                if (dist < 1.5 && heightDiff < 5) {
+                    const now = performance.now();
+                    if (now - e.lastAttack > 1000) { takeDamage(10); e.lastAttack = now; }
+                }
+            });
+        }
+
+        function checkEnemyCollision(enemyMesh) {
+            const r = 0.6; const pos = enemyMesh.position;
+            const box = new THREE.Box3(new THREE.Vector3(pos.x-r, pos.y-0.75, pos.z-r), new THREE.Vector3(pos.x+r, pos.y+0.75, pos.z+r));
+            for (const mesh of collidableMeshList) {
+                if (mesh.userData.isWall && box.intersectsBox(new THREE.Box3().setFromObject(mesh))) return true;
+            }
+            return false;
+        }
+
+        function updateChests(delta) {
+            const playerBox = new THREE.Box3().setFromObject(camera); playerBox.expandByScalar(0.5);
+            for (let i = chests.length - 1; i >= 0; i--) {
+                const c = chests[i]; c.rotation.y += delta;
+                if (playerBox.intersectsBox(new THREE.Box3().setFromObject(c))) {
+                    applyBuff(c.userData.type, c.userData.name); scene.remove(c); chests.splice(i, 1);
+                }
+            }
+        }
+
+        function applyBuff(type, name) {
+            showMessage(`獲得: ${name}`, "#00ffff");
+            if (type === 'speed') { player.speedMultiplier = 2.0; document.getElementById('buff-text').innerText = "加速中"; setTimeout(() => { player.speedMultiplier = 1.0; document.getElementById('buff-text').innerText = "無"; }, 5000); }
+            else if (type === 'damage') { player.damageMultiplier = 3.0; document.getElementById('buff-text').innerText = "攻擊提升"; setTimeout(() => { player.damageMultiplier = 1.0; document.getElementById('buff-text').innerText = "無"; }, 5000); }
+            else if (type === 'invincible') { player.isInvincible = true; document.getElementById('buff-text').innerText = "無敵時間"; document.getElementById('buff-text').style.color = "gold"; setTimeout(() => { player.isInvincible = false; document.getElementById('buff-text').innerText = "無"; document.getElementById('buff-text').style.color = "#00ff00";}, 5000); }
+            else if (type === 'heal') { player.hp = Math.min(player.hp + 30, player.maxHp); updateHUD(); }
+        }
+
+        function takeDamage(amount) {
+            if (player.isInvincible) return;
+            player.hp -= amount; updateHUD();
+            const overlay = document.getElementById('damage-overlay');
+            overlay.style.opacity = 0.5; setTimeout(() => overlay.style.opacity = 0, 100);
+            if (player.hp <= 0) gameOver();
+        }
+
+        function checkWallCollision() {
+            const r = 0.5; const pos = camera.position;
+            const playerBox = new THREE.Box3(new THREE.Vector3(pos.x-r, pos.y-player.height+0.1, pos.z-r), new THREE.Vector3(pos.x+r, pos.y, pos.z+r));
+            for (const mesh of collidableMeshList) {
+                if (mesh.userData.isWall && playerBox.intersectsBox(new THREE.Box3().setFromObject(mesh))) return true;
+            }
+            return false;
+        }
+
+        function checkTeleporters() {
+            const playerPos = camera.position;
+            collidableMeshList.forEach(obj => {
+                if (obj.userData.isTeleporter) {
+                    const distXZ = Math.hypot(obj.position.x - playerPos.x, obj.position.z - playerPos.z);
+                    const distY = Math.abs(obj.position.y - playerPos.y);
+                    if (distXZ < 2 && distY < 2) {
+                        const targetY = (obj.userData.targetFloor - 1) * FLOOR_HEIGHT + player.height;
+                        const targetZ = obj.userData.isUp ? HALLWAY_LENGTH/2 - 10 : -HALLWAY_LENGTH/2 + 10;
+                        camera.position.set(0, targetY, targetZ);
+                        player.currentFloor = obj.userData.targetFloor;
+                        showMessage(`前往 ${player.currentFloor} 樓`, "white"); updateHUD();
+                    }
+                }
+            });
+        }
+
+        function updateHUD() {
+            document.getElementById('hp-text').innerText = Math.floor(player.hp);
+            document.getElementById('hp-bar').style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
+            document.getElementById('score-text').innerText = player.score;
+            document.getElementById('floor-text').innerText = player.currentFloor;
+        }
+
+        function showMessage(text, color) {
+            const el = document.getElementById('message-area');
+            el.innerText = text; el.style.color = color; el.style.opacity = 1;
+            setTimeout(() => el.style.opacity = 0, 2000);
+        }
+
+        function gameOver() {
+            isGameOver = true; isGameActive = false;
+            document.getElementById('start-screen').innerHTML = `<h1 style="color:red">GAME OVER</h1><p>最終分數: ${player.score}</p><button onclick="location.reload()">重新開始</button>`;
+            document.getElementById('start-screen').style.display = 'flex';
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (isGameActive && !isGameOver) {
+                const time = performance.now(); const delta = (time - prevTime) / 1000;
+                
+                // 1. 移動控制
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+                velocity.y -= 9.8 * 20.0 * delta; 
+
+                direction.z = Number(handMoveForward) - Number(handMoveBackward);
+                // [修改] 移除左右移動的輸入控制 (強制為 0)
+                direction.x = 0; 
+                direction.normalize(); 
+
+                // [修改] 降低移動速度 (從 150.0 降至 50.0)
+                const speed = 50.0 * player.speedMultiplier;
+                
+                if (handMoveForward || handMoveBackward) velocity.z -= direction.z * speed * delta;
+                // if (handMoveLeft || handMoveRight) velocity.x -= direction.x * speed * delta; // [修改] 移除左右移動的輸入應用
+
+                // 2. 頭部瞄準控制 (Head Aim)
+                const rotSpeed = 2.0 * delta;
+                camera.rotation.y -= headLookYaw * rotSpeed;
+                camera.rotation.x -= headLookPitch * rotSpeed;
+                camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x)); // 限制上下視角
+
+                // 3. 射擊
+                if (isPinching && !wasPinching) shoot();
+                wasPinching = isPinching;
+
+                // 4. 物理與碰撞
+                const oldPos = camera.position.clone();
+                const moveVec = new THREE.Vector3();
+                if (velocity.x !== 0) {
+                    const sideDir = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+                    sideDir.y = 0; sideDir.normalize();
+                    moveVec.addScaledVector(sideDir, velocity.x * delta);
+                }
+                if (velocity.z !== 0) {
+                    const fwdDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                    fwdDir.y = 0; fwdDir.normalize();
+                    moveVec.addScaledVector(fwdDir, -velocity.z * delta);
+                }
+                
+                camera.position.x += moveVec.x; camera.position.z += moveVec.z;
+                if (checkWallCollision()) {
+                    const tempPos = camera.position.clone();
+                    camera.position.z = oldPos.z;
+                    if (checkWallCollision()) {
+                        camera.position.z = tempPos.z; camera.position.x = oldPos.x;
+                        if (checkWallCollision()) camera.position.copy(oldPos);
+                    }
+                }
+                
+                camera.position.y += velocity.y * delta; 
+                const floorLevel = (player.currentFloor - 1) * FLOOR_HEIGHT;
+                if (camera.position.y < floorLevel + player.height) {
+                    velocity.y = 0; camera.position.y = floorLevel + player.height;
+                }
+
+                updateBullets(delta); updateEnemies(delta); updateChests(delta); checkTeleporters();
+                prevTime = time;
+            }
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
