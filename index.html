@@ -113,16 +113,16 @@
         <div id="message-area" class="message"></div>
         <div id="hud-bottom">
             <div>狀態: <span id="buff-text" style="color:#00ff00;">無</span></div>
-            <div style="font-size: 14px; color: #ccc;">頭部轉動瞄準 | 左手手指指向移動 | 右手捏合射擊</div>
+            <div style="font-size: 14px; color: #ccc;">頭部/鍵盤瞄準 | 左手手指移動 | 右手捏合射擊</div>
         </div>
         <div class="instruction-overlay">
-            <p>🙂 <b>頭部 (瞄準)</b></p>
-            <p>頭部轉向/移動: 控制準心</p>
-            <p>保持頭部在中央十字: 停止旋轉</p>
+            <p>🙂 <b>瞄準 (頭部 + 鍵盤)</b></p>
+            <p>頭部轉向: 模擬搖桿</p>
+            <p>方向鍵 (↑↓←→): 輔助轉向</p>
+            <p>空白鍵 (Space): 視角回正</p>
             <br>
             <p>🖐️ <b>左手 (移動)</b></p>
-            <p>☝️ 手指指向上: 前進</p>
-            <p>👇 手指指向下: 後退</p>
+            <p>☝️ 指向上: 前進 | 👇 指向下: 後退</p>
             <p>✊ 握拳: 停止移動</p>
             <br>
             <p>🖐️ <b>右手 (攻擊)</b></p>
@@ -141,7 +141,7 @@
     <div id="start-screen">
         <h1>善用 AI 學習 - 長廊挑戰</h1>
         <p>這是一條充滿考驗的長走廊</p>
-        <p>收集沿途的 3 個寶箱，並擊敗守衛怪物</p>
+        <p>收集沿途的 3 個善用AI助學習的寶箱，並擊敗錯誤使用AI的守衛怪物</p>
         <div id="loading">載入神經網絡模型中... (請稍候)</div>
         <button id="start-btn" style="display:none;">開啟攝影機並開始</button>
     </div>
@@ -151,14 +151,14 @@
         import * as THREE from 'three';
 
         // --- 遊戲常數與變數 ---
-        const HALLWAY_WIDTH = 12;
+        const HALLWAY_WIDTH = 24; 
         const HALLWAY_LENGTH = 200; 
         
-        const BAD_HABITS = ["直接抄襲", "不做查證", "洩露隱私", "停止思考", "盲目相信", "過度依賴", "忽視版權"];
+        const BAD_HABITS = ["直接抄襲", "不做查證", "洩露隱私", "盲目相信", "過度依賴", "忽視版權"];
         const GOOD_HABITS = [
-            ["輔助思考", "speed", "#00ffff"], ["檢查來源", "damage", "#ff00ff"],
-            ["優化語法", "heal", "#00ff00"], ["激發創意", "invincible", "#ffd700"],
-            ["解釋代碼", "heal", "#00ff00"]
+            ["輔助思考而非替代思考", "damage", "#00ffff"], ["檢查來源驗證真確", "damage", "#ff00ff"],
+            ["用於語言與寫作練習", "heal", "#00ff00"], ["激發創意", "invincible", "#ffd700"],
+            ["幫助整理與總結", "heal", "#00ff00"]
         ];
 
         let camera, scene, renderer;
@@ -170,6 +170,9 @@
         let isPinching = false;
         let wasPinching = false;
         
+        // 鍵盤視角控制變數
+        let keyLookUp = false, keyLookDown = false, keyLookLeft = false, keyLookRight = false;
+
         let prevTime = performance.now();
         let isGameOver = false; 
         let isGameActive = false; 
@@ -297,6 +300,26 @@
             renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
+            // 鍵盤監聽事件：包含方向鍵和空白鍵
+            document.addEventListener('keydown', (event) => {
+                switch(event.code) {
+                    case 'ArrowUp': keyLookUp = true; break;
+                    case 'ArrowDown': keyLookDown = true; break;
+                    case 'ArrowLeft': keyLookLeft = true; break;
+                    case 'ArrowRight': keyLookRight = true; break;
+                    case 'Space': camera.rotation.set(0, 0, 0); break;
+                }
+            });
+
+            document.addEventListener('keyup', (event) => {
+                switch(event.code) {
+                    case 'ArrowUp': keyLookUp = false; break;
+                    case 'ArrowDown': keyLookDown = false; break;
+                    case 'ArrowLeft': keyLookLeft = false; break;
+                    case 'ArrowRight': keyLookRight = false; break;
+                }
+            });
+
             startBtn.addEventListener('click', () => {
                 startBtn.disabled = true;
                 startBtn.innerText = "啟動攝影機中...";
@@ -325,37 +348,77 @@
             animate();
         }
 
+        // [修改] 文字紋理生成器，支援自動換行
         function createTextTexture(text, bgColor, textColor = 'white') {
             const canvas = document.createElement('canvas');
             canvas.width = 256; canvas.height = 128; 
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = bgColor; ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.lineWidth = 10; ctx.strokeStyle = '#ffffff'; ctx.strokeRect(0, 0, canvas.width, canvas.height);
-            ctx.font = 'bold 36px "Microsoft JhengHei", Arial';
+            
+            const fontSize = 28; // 稍微調小一點
+            ctx.font = `bold ${fontSize}px "Microsoft JhengHei", Arial`;
             ctx.fillStyle = textColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+            
+            // 自動換行邏輯
+            const maxWidth = canvas.width - 20;
+            const words = text.split(''); // 中文依字元分割
+            let line = '';
+            let lines = [];
+            
+            for(let n = 0; n < words.length; n++) {
+                const testLine = line + words[n];
+                const metrics = ctx.measureText(testLine);
+                const testWidth = metrics.width;
+                if (testWidth > maxWidth && n > 0) {
+                    lines.push(line);
+                    line = words[n];
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line);
+
+            const lineHeight = fontSize + 5;
+            const totalHeight = lines.length * lineHeight;
+            const startY = (canvas.height - totalHeight) / 2 + lineHeight / 2;
+
+            for (let i = 0; i < lines.length; i++) {
+                ctx.fillText(lines[i], canvas.width / 2, startY + i * lineHeight);
+            }
+
             return new THREE.CanvasTexture(canvas);
+        }
+
+        function createTileTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#f5e6d3'; ctx.fillRect(0, 0, 64, 64);
+            ctx.strokeStyle = '#8d6e63'; ctx.lineWidth = 2; ctx.strokeRect(0, 0, 64, 64);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
+            return texture;
         }
 
         // --- 地圖生成 ---
         function generateSchool() {
             const wallMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee }); 
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63 }); 
             const ceilingMat = new THREE.MeshStandardMaterial({ color: 0xdddddd }); 
+            
+            const floorTexture = createTileTexture();
+            floorTexture.repeat.set(HALLWAY_WIDTH / 2, HALLWAY_LENGTH / 2); 
+            const floorMat = new THREE.MeshStandardMaterial({ map: floorTexture });
 
-            // 地板與天花板 (長度範圍: Z = 100 到 -100)
             const floorGeo = new THREE.PlaneGeometry(HALLWAY_WIDTH, HALLWAY_LENGTH);
             const floor = new THREE.Mesh(floorGeo, floorMat);
-            floor.rotation.x = -Math.PI / 2; 
-            floor.position.set(0, 0, 0); 
+            floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, 0); 
             scene.add(floor); collidableMeshList.push(floor);
 
             const ceil = new THREE.Mesh(floorGeo, ceilingMat);
-            ceil.rotation.x = Math.PI / 2; 
-            ceil.position.set(0, 5, 0);
+            ceil.rotation.x = Math.PI / 2; ceil.position.set(0, 5, 0);
             scene.add(ceil);
 
-            // 兩側牆壁 (全長實心牆)
             const wallLength = HALLWAY_LENGTH;
             const wallHeight = 5;
             const wallGeo = new THREE.BoxGeometry(1, wallHeight, wallLength);
@@ -371,7 +434,6 @@
             scene.add(rightWall); collidableMeshList.push(rightWall);
 
             const endWallGeo = new THREE.BoxGeometry(HALLWAY_WIDTH + 2, wallHeight, 1);
-            
             const startWall = new THREE.Mesh(endWallGeo, wallMat);
             startWall.position.set(0, wallHeight/2, HALLWAY_LENGTH/2);
             startWall.userData = { isWall: true };
@@ -398,36 +460,87 @@
             
             for (let i = 0; i < 3; i++) {
                 const habit = shuffledGood[i % shuffledGood.length];
-                // [修改] 隨機 X 位置 (範圍 -4 到 4，走廊寬度的一半減去一些邊距)
-                const randomX = (Math.random() - 0.5) * 8; 
+                const randomX = (Math.random() - 0.5) * (HALLWAY_WIDTH - 4); 
                 createChest(randomX, 0, chestPositionsZ[i], habit); 
             }
 
-            // [修改] 怪物位置移到最中間 (Z=0)
             const enemyZ = 0; 
             const badHabit = shuffledBad[0];
             createEnemy(0, 0, enemyZ, badHabit);
         }
 
         function createEnemy(x, y, z, habitName) {
-            // [修改] 怪物變大 1 倍 (3x3x3)
-            const enemy = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), new THREE.MeshStandardMaterial({ map: createTextTexture(habitName, '#d32f2f') }));
-            // y 調整高度 (1.5)
-            enemy.position.set(x, y + 1.5, z); 
-            scene.add(enemy);
-            // [修改] 速度再慢一點 (除以 4)
-            enemies.push({ mesh: enemy, hp: 3, speed: (3 + Math.random() * 2) / 4, lastAttack: 0 });
+            const enemyGroup = new THREE.Group();
+            enemyGroup.position.set(x, y, z);
+
+            const bodyGeometry = new THREE.BoxGeometry(3, 3, 3);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xd32f2f }); 
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.set(0, 1.5, 0); 
+            enemyGroup.add(body);
+
+            const hornGeometry = new THREE.ConeGeometry(0.5, 1.5, 8);
+            const hornMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 }); 
+
+            const leftHorn = new THREE.Mesh(hornGeometry, hornMaterial);
+            leftHorn.position.set(-1, 3.5, 0); leftHorn.rotation.z = Math.PI / 6; 
+            enemyGroup.add(leftHorn);
+
+            const rightHorn = new THREE.Mesh(hornGeometry, hornMaterial);
+            rightHorn.position.set(1, 3.5, 0); rightHorn.rotation.z = -Math.PI / 6; 
+            enemyGroup.add(rightHorn);
+            
+            const eyeGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+            const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5 });
+
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(-0.8, 2, 1.5); 
+            enemyGroup.add(leftEye);
+
+            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            rightEye.position.set(0.8, 2, 1.5); 
+            enemyGroup.add(rightEye);
+
+            const spriteMap = createTextTexture(habitName, "rgba(255,255,255,0.7)", "black");
+            const spriteMaterial = new THREE.SpriteMaterial({ map: spriteMap });
+            const label = new THREE.Sprite(spriteMaterial);
+            label.position.set(0, 4.5, 0); label.scale.set(6, 3, 1);
+            enemyGroup.add(label);
+
+            scene.add(enemyGroup);
+            enemies.push({ mesh: enemyGroup, hp: 3, speed: (3 + Math.random() * 2) / 4, lastAttack: 0 });
         }
 
         function createChest(x, y, z, habitData) {
             const [name, effect, color] = habitData;
-            // [修改] 寶箱大小變大 1 倍 (2x2x2) 和字體白色 (#ffffff)
-            const chest = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshStandardMaterial({ map: createTextTexture(name, color, '#ffffff'), metalness: 0.5, roughness: 0.1 }));
-            // Y 軸高度調整 (1.0)
-            chest.position.set(x, y + 1.0, z); 
-            // [新增] 左右移動屬性
-            chest.userData = { type: effect, name: name, initialX: x, moveSpeed: 1 + Math.random(), moveRange: 3 };
-            scene.add(chest); chests.push(chest);
+            
+            const chestGroup = new THREE.Group();
+            chestGroup.position.set(x, y, z);
+
+            const bodyGeometry = new THREE.BoxGeometry(2, 1.2, 2);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: color, metalness: 0.5, roughness: 0.1 });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.set(0, 0.6, 0); chestGroup.add(body);
+
+            const lidGeometry = new THREE.BoxGeometry(2.1, 0.6, 2.1);
+            const darkerColor = new THREE.Color(color).multiplyScalar(0.8);
+            const lidMaterial = new THREE.MeshStandardMaterial({ color: darkerColor, metalness: 0.5, roughness: 0.1 });
+            const lid = new THREE.Mesh(lidGeometry, lidMaterial);
+            lid.position.set(0, 1.5, 0); chestGroup.add(lid);
+
+            const lockGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.2);
+            const lockMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00, metalness: 0.8, roughness: 0.2 });
+            const lock = new THREE.Mesh(lockGeometry, lockMaterial);
+            lock.position.set(0, 1.2, 1.05); chestGroup.add(lock);
+            
+            const spriteMap = createTextTexture(name, "rgba(255,255,255,0.7)", "black");
+            const spriteMaterial = new THREE.SpriteMaterial({ map: spriteMap });
+            const label = new THREE.Sprite(spriteMaterial);
+            label.position.set(0, 2.5, 0); label.scale.set(4, 2, 1);
+            chestGroup.add(label);
+
+            chestGroup.userData = { type: effect, name: name, initialX: x, moveSpeed: 1 + Math.random(), moveRange: 3 };
+            scene.add(chestGroup); chests.push(chestGroup);
         }
 
         function shoot() {
@@ -458,8 +571,11 @@
                             scene.remove(e.mesh); enemies.splice(j, 1);
                             player.score += 100; updateHUD(); showMessage("消滅錯誤觀念!", "#4caf50");
                         } else {
-                             e.mesh.material.color.setHex(0xffffff);
-                             setTimeout(() => e.mesh.material.color.setHex(0xffffff), 50); 
+                             const bodyMesh = e.mesh.children.find(child => child.geometry.type === 'BoxGeometry' && child.position.y === 1.5);
+                             if (bodyMesh) {
+                                 bodyMesh.material.color.setHex(0xffffff);
+                                 setTimeout(() => bodyMesh.material.color.setHex(0xd32f2f), 50); 
+                             }
                         }
                         break;
                     }
@@ -478,7 +594,7 @@
                     e.mesh.translateZ(e.speed * delta);
                     if (checkEnemyCollision(e.mesh)) e.mesh.position.copy(oldPos);
                 }
-                if (dist < 2.5) { // 攻擊距離稍微增加，因為體型變大了
+                if (dist < 2.5) { 
                     const now = performance.now();
                     if (now - e.lastAttack > 1000) { takeDamage(10); e.lastAttack = now; }
                 }
@@ -486,9 +602,9 @@
         }
 
         function checkEnemyCollision(enemyMesh) {
-            const r = 1.2; // 增加碰撞半徑
+            const r = 1.2; 
             const pos = enemyMesh.position;
-            const box = new THREE.Box3(new THREE.Vector3(pos.x-r, pos.y-1.5, pos.z-r), new THREE.Vector3(pos.x+r, pos.y+1.5, pos.z+r));
+            const box = new THREE.Box3(new THREE.Vector3(pos.x-r, pos.y, pos.z-r), new THREE.Vector3(pos.x+r, pos.y+4, pos.z+r));
             for (const mesh of collidableMeshList) {
                 if (mesh.userData.isWall && box.intersectsBox(new THREE.Box3().setFromObject(mesh))) return true;
             }
@@ -500,8 +616,6 @@
             const time = performance.now() / 1000;
             for (let i = chests.length - 1; i >= 0; i--) {
                 const c = chests[i]; 
-                c.rotation.y += delta;
-                // [新增] 寶箱左右移動
                 c.position.x = c.userData.initialX + Math.sin(time * c.userData.moveSpeed) * c.userData.moveRange;
 
                 if (playerBox.intersectsBox(new THREE.Box3().setFromObject(c))) {
@@ -567,7 +681,8 @@
             isGameOver = true; isGameActive = false;
             document.getElementById('start-screen').innerHTML = `
                 <h1 style="color:#4caf50">恭喜通關！</h1>
-                <p>你已經集齊 3 個正確的 AI 學習觀念！</p>
+                <p>集齊 3 個正確使用 AI 學習的觀念！</p>
+                <p>你已裝備好生成式人工智能這個學習利器！</p>
                 <p>最終分數: ${player.score}</p>
                 <button onclick="location.reload()">再次挑戰</button>
             `;
@@ -594,6 +709,13 @@
 
                 const speed = 50.0 * player.speedMultiplier;
                 if (handMoveForward || handMoveBackward) velocity.z -= direction.z * speed * delta;
+
+                // [修改] 鍵盤輔助瞄準
+                const keySpeed = 1.5;
+                if (keyLookLeft) camera.rotation.y += keySpeed * delta;
+                if (keyLookRight) camera.rotation.y -= keySpeed * delta;
+                if (keyLookUp) camera.rotation.x += keySpeed * delta; // 抬頭 (增加X軸角度，視邏輯調整)
+                if (keyLookDown) camera.rotation.x -= keySpeed * delta; // 低頭
 
                 const rotSpeed = 2.0 * delta;
                 camera.rotation.y -= headLookYaw * rotSpeed;
