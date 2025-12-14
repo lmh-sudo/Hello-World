@@ -1,0 +1,2299 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>網絡架構師 - 進階網絡課程 (15關)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body {
+overscroll-behavior: none;
+touch-action: none;
+font-family: 'Noto Sans TC', sans-serif;
+}
+.canvas-bg {
+background-color: #f0f4f8;
+background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+background-size: 20px 20px;
+}
+.tool-btn {
+transition: all 0.2s;
+}
+.tool-btn:active {
+transform: scale(0.95);
+}
+.tool-btn.active-tool {
+background-color: #dbeafe; /* blue-100 */
+border-color: #3b82f6; /* blue-500 */
+color: #1d4ed8;
+box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+}
+.tool-locked {
+opacity: 0.4;
+cursor: not-allowed;
+filter: grayscale(100%);
+position: relative;
+}
+.selected {
+ring: 2px;
+ring-color: #3b82f6;
+}
+/* Custom scrollbar for tool panel */
+.tool-panel::-webkit-scrollbar {
+height: 6px;
+width: 6px;
+}
+.tool-panel::-webkit-scrollbar-thumb {
+background: #cbd5e1;
+border-radius: 3px;
+}
+@keyframes pulse-green {
+0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+50% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+}
+</style>
+</head>
+<body class="h-screen w-screen flex flex-col overflow-hidden bg-gray-50 text-gray-800">
+
+<!-- Header -->
+<header class="bg-blue-600 text-white p-3 shadow-md flex justify-between items-center z-10">
+<div class="flex items-center gap-2">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+</svg>
+<div class="flex flex-col">
+<h1 class="font-bold text-lg leading-tight">網絡架構師</h1>
+<span id="level-title" class="text-xs text-blue-100">載入中...</span>
+</div>
+</div>
+<div class="flex gap-2 items-center">
+<!-- Level Selector -->
+<select id="level-select" onchange="jumpToLevel(this.value)" class="bg-blue-700 text-white border border-blue-500 rounded text-sm px-2 py-1 outline-none hover:bg-blue-800 transition-colors cursor-pointer mr-2">
+<!-- Options populated by JS -->
+</select>
+
+<button onclick="resetLevel()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm shadow">重置</button>
+<button onclick="showMission()" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm shadow animate-pulse">目標</button>
+</div>
+</header>
+
+<!-- Main Content -->
+<div class="flex-1 flex flex-col md:flex-row relative overflow-hidden">
+
+<!-- Toolbar (Bottom on mobile, Left on Desktop) -->
+<div class="tool-panel order-2 md:order-1 bg-white border-t md:border-t-0 md:border-r border-gray-200 p-2 md:w-72 flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto z-10 shadow-lg md:shadow-none whitespace-nowrap md:whitespace-normal h-32 md:h-full items-center md:items-stretch">
+
+<!-- Connection Tools -->
+<div class="text-xs font-bold text-gray-400 uppercase tracking-wider hidden md:block mb-1">連接線材</div>
+<div class="flex gap-2 w-full md:grid md:grid-cols-2">
+<button onclick="activateTool('copper')" id="tool-copper" class="tool-btn flex flex-col items-center gap-1 p-2 bg-gray-50 hover:bg-blue-50 border rounded w-full min-w-[60px]">
+<div class="w-8 h-8 flex justify-center items-center">
+<div class="w-full h-1 bg-gray-600 rounded transform -rotate-45"></div>
+</div>
+<span class="text-[10px] md:text-xs font-medium text-center">雙扭線</span>
+</button>
+<button onclick="activateTool('fiber')" id="tool-fiber" class="tool-btn flex flex-col items-center gap-1 p-2 bg-gray-50 hover:bg-blue-50 border rounded w-full min-w-[60px] tool-locked">
+<div class="w-8 h-8 flex justify-center items-center relative">
+<div class="w-full h-1.5 bg-orange-500 rounded transform -rotate-45 shadow-[0_0_8px_rgba(249,115,22,0.8)]"></div>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-[10px] md:text-xs font-medium text-center text-orange-600">光纖</span>
+</button>
+<!-- WiFi Tool -->
+<button onclick="activateTool('wifi')" id="tool-wifi" class="tool-btn flex flex-col items-center gap-1 p-2 bg-gray-50 hover:bg-blue-50 border rounded w-full min-w-[60px] tool-locked">
+<div class="w-8 h-8 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+</svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-[10px] md:text-xs font-medium text-center text-sky-600">Wi-Fi</span>
+</button>
+<!-- 5G Radio Tool -->
+<button onclick="activateTool('radio')" id="tool-radio" class="tool-btn flex flex-col items-center gap-1 p-2 bg-gray-50 hover:bg-blue-50 border rounded w-full min-w-[60px] tool-locked">
+<div class="w-8 h-8 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+</svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-[10px] md:text-xs font-medium text-center text-indigo-600">無線電波</span>
+</button>
+<!-- Bluetooth Tool -->
+<button onclick="activateTool('bluetooth')" id="tool-bluetooth" class="tool-btn flex flex-col items-center gap-1 p-2 bg-gray-50 hover:bg-blue-50 border rounded w-full min-w-[60px] tool-locked">
+<div class="w-8 h-8 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-cyan-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M7 17l10-10-5-5v20l5-5-10-10"/>
+</svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-[10px] md:text-xs font-medium text-center text-cyan-600">藍芽</span>
+</button>
+</div>
+
+<div class="w-full border-t border-gray-200 my-1 hidden md:block"></div>
+
+<div class="text-xs font-bold text-gray-400 uppercase tracking-wider hidden md:block mb-1">終端設備</div>
+
+<!-- End Devices -->
+<button onclick="activateTool('pc')" id="tool-pc" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full">
+<div class="w-8 h-8 text-gray-700 flex justify-center items-center">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+</div>
+<span class="text-xs md:text-sm font-medium">電腦 (PC)</span>
+</button>
+
+<button onclick="activateTool('smartphone')" id="tool-smartphone" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-indigo-500 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+</svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium">智能電話</span>
+</button>
+
+<!-- Smart Curtain (New) -->
+<button onclick="activateTool('curtain')" id="tool-curtain" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-amber-500 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h16v16H4V4zm8 0v16M4 12h16" />
+</svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium">智能窗簾</span>
+</button>
+
+<button onclick="activateTool('tablet')" id="tool-tablet" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-pink-500 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+</svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium">平板電腦</span>
+</button>
+
+<button onclick="activateTool('printer')" id="tool-printer" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-slate-600 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium">打印機</span>
+</button>
+
+<button onclick="activateTool('server')" id="tool-server" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-purple-600 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" /></svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium">伺服器</span>
+</button>
+
+<button onclick="activateTool('nic')" id="tool-nic" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border border-green-200 rounded min-w-[70px] md:w-full group">
+<div class="w-8 h-8 text-green-600 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="12" x="3" y="6" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M12 12v6"/><path d="M12 18h-4"/><path d="M12 18h4"/></svg>
+<div class="absolute -top-1 -right-1 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">+</div>
+</div>
+<div class="flex flex-col items-center md:items-start">
+<span class="text-xs md:text-sm font-medium text-green-700">網絡卡 (NIC)</span>
+<span class="text-[10px] text-green-500">有線連接</span>
+</div>
+</button>
+
+<!-- New WNIC Tool -->
+<button onclick="activateTool('wnic')" id="tool-wnic" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border border-sky-200 rounded min-w-[70px] md:w-full group tool-locked">
+<div class="w-8 h-8 text-sky-600 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+</svg>
+<div class="absolute -top-1 -right-1 bg-sky-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">+</div>
+</div>
+<div class="flex flex-col items-center md:items-start">
+<span class="text-xs md:text-sm font-medium text-sky-700">無線網卡</span>
+<span class="text-[10px] text-sky-500">無線連接</span>
+</div>
+</button>
+
+<div class="w-full border-t border-gray-200 my-1 hidden md:block"></div>
+<div class="text-xs font-bold text-gray-400 uppercase tracking-wider hidden md:block mb-1">網絡設備</div>
+
+<button onclick="activateTool('switch')" id="tool-switch" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-teal-600 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="6" rx="2"/><path d="M6 10v4"/><path d="M10 10v4"/><path d="M14 10v4"/><path d="M18 10v4"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 18v.01"/><path d="M10 18v.01"/><path d="M14 18v.01"/><path d="M18 18v.01"/></svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium">交換器</span>
+</button>
+
+<button onclick="activateTool('ap')" id="tool-ap" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-violet-600 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+</svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium">無線存取點</span>
+</button>
+
+<button onclick="activateTool('5g_tower')" id="tool-5g_tower" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-rose-500 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+</svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium">5G 發射站</span>
+</button>
+
+<button onclick="activateTool('router')" id="tool-router" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-indigo-600 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6.01 18h.01"/><path d="M10.01 18h.01"/><path d="M15 10v4"/><path d="M17.84 7.17a4 4 0 0 0-5.66 0"/><path d="M20.66 4.34a8 8 0 0 0-11.31 0"/></svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium">路由器</span>
+</button>
+
+<!-- Firewall Tool -->
+<button onclick="activateTool('firewall')" id="tool-firewall" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-red-600 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+</svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium">防火牆</span>
+</button>
+
+<!-- DSL Modem -->
+<button onclick="activateTool('modem')" id="tool-modem" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-gray-800 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><path d="M2 12h20"/><path d="M6 12v-2"/><path d="M10 12v-2"/><path d="M14 12v-2"/></svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium leading-tight">數碼用戶線<br>數據機</span>
+</button>
+
+<!-- Fiber Modem (ONT) -->
+<button onclick="activateTool('ont')" id="tool-ont" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-pink-600 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6"/><path d="M12 12V8"/><path d="M12 4v4"/><circle cx="12" cy="4" r="2"/></svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium">光纖數據機</span>
+</button>
+
+<button onclick="activateTool('internet')" id="tool-internet" class="tool-btn flex flex-col md:flex-row items-center gap-2 p-2 bg-gray-50 hover:bg-blue-50 border rounded min-w-[70px] md:w-full tool-locked">
+<div class="w-8 h-8 text-blue-500 flex justify-center items-center relative">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>
+<div class="lock-icon absolute -top-1 -right-1 bg-gray-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"><svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg></div>
+</div>
+<span class="text-xs md:text-sm font-medium">互聯網</span>
+</button>
+</div>
+
+<!-- Canvas Area -->
+<div class="order-1 md:order-2 flex-1 relative canvas-bg overflow-hidden" id="canvas-container">
+<!-- Mission Overlay -->
+<div id="mission-overlay" class="absolute top-4 left-4 z-20 bg-white/95 backdrop-blur shadow-lg rounded-lg border-l-4 border-blue-600 p-4 max-w-sm hidden md:block transition-colors">
+<h3 class="font-bold text-gray-800" id="mission-title">載入中...</h3>
+<ul class="text-sm text-gray-600 list-disc list-inside mt-2 space-y-1" id="mission-list">
+<!-- Dynamic Items -->
+</ul>
+</div>
+
+<canvas id="gameCanvas" class="block cursor-crosshair"></canvas>
+
+<!-- Floating Action Buttons -->
+<div class="absolute bottom-4 right-4 flex flex-col gap-3">
+<div id="mode-indicator" class="bg-white/90 backdrop-blur px-4 py-2 rounded-lg shadow-lg border border-gray-200 text-sm font-bold text-gray-700 mb-2 text-center">
+模式: 移動
+</div>
+
+<button id="btn-mode-move" onclick="setMode('move')" class="w-14 h-14 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-blue-500 text-blue-600 active:bg-blue-50 transition-colors tooltip" title="移動設備">
+<!-- Changed to Cursor Icon -->
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+</svg>
+</button>
+<button id="btn-mode-connect" onclick="setMode('connect')" class="w-14 h-14 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-transparent text-gray-600 active:bg-gray-100 transition-colors" title="連線">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+</button>
+<button id="btn-mode-delete" onclick="setMode('delete')" class="w-14 h-14 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-transparent text-red-500 active:bg-red-50 transition-colors" title="刪除">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+</button>
+
+<div class="h-4"></div>
+
+<button onclick="testConnection()" id="btn-test" class="w-14 h-14 bg-green-500 hover:bg-green-600 text-white rounded-full shadow-lg flex items-center justify-center animate-bounce-slow ring-4 ring-green-200" title="測試網絡">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+</button>
+</div>
+
+<!-- Success/Next Level Modal Container -->
+<div id="success-modal" class="absolute bottom-24 right-4 md:right-24 md:bottom-8 bg-white/95 backdrop-blur p-4 rounded-lg shadow-2xl border border-green-200 transform translate-y-20 opacity-0 transition-all duration-300 hidden z-50 max-w-sm">
+<div class="flex items-start gap-3">
+<div class="bg-green-100 p-2 rounded-full text-green-600">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+</div>
+<div>
+<h4 class="font-bold text-gray-800 text-lg">測試成功！</h4>
+<p class="text-sm text-gray-600 mb-3" id="success-msg">網絡運作正常。</p>
+<button onclick="nextLevel()" id="btn-next-level" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow flex items-center gap-2">
+進入下一關
+<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+</button>
+</div>
+</div>
+</div>
+
+<!-- Toast Message Box (Moved to Top Right) -->
+<div id="message-box" class="absolute top-4 left-4 right-4 md:left-auto md:right-4 md:w-80 bg-white/95 backdrop-blur p-4 rounded-lg shadow-xl border-l-4 border-blue-500 transition-all duration-300 pointer-events-none opacity-0 transform -translate-y-4">
+<h3 class="font-bold text-gray-800 mb-1" id="msg-title">Title</h3>
+<p class="text-sm text-gray-600" id="msg-body">Body</p>
+</div>
+</div>
+</div>
+
+<!-- Intro/Mission Modal -->
+<div id="mission-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm hidden">
+<div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
+<div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4" id="modal-icon-container">
+<!-- Icon injected by JS -->
+</div>
+<h2 class="text-2xl font-bold mb-2 text-gray-800" id="modal-title">標題</h2>
+<p class="text-gray-600 mb-6" id="modal-desc">描述</p>
+
+<div class="bg-gray-50 p-4 rounded-lg text-left mb-6 border border-gray-200">
+<h3 class="font-bold text-gray-700 mb-2 text-sm uppercase tracking-wide">任務目標：</h3>
+<ol class="list-decimal list-inside space-y-2 text-sm text-gray-600" id="modal-goals">
+<!-- Goals injected by JS -->
+</ol>
+</div>
+
+<button onclick="closeMission()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold text-lg shadow-lg transform transition hover:scale-[1.02]">開始挑戰</button>
+</div>
+</div>
+
+<script>
+/**
+* Network Builder Game - Extended 15 Levels (IoT)
+*/
+
+// --- Configuration ---
+const COLORS = {
+selected: '#3b82f6',
+linkCopper: '#475569',
+linkFiber: '#f97316',
+linkWifi: '#3b82f6', // Blue for Wifi
+linkRadio: '#8b5cf6', // Violet for Radio
+linkBluetooth: '#06b6d4', // Cyan for Bluetooth
+linkActive: '#22c55e',
+linkBroken: '#ef4444',
+text: '#1e293b',
+nic: '#16a34a'
+};
+
+const DEVICES = {
+internet: { 
+    label: "Internet", color: "#3b82f6", icon: "cloud", type: 'node',
+    paths: ["M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"]
+},
+router: { 
+    label: "Router", color: "#4f46e5", icon: "router", type: 'node',
+    paths: [
+        "M6.01 18h.01M10.01 18h.01M15 10v4M17.84 7.17a4 4 0 0 0-5.66 0M20.66 4.34a8 8 0 0 0-11.31 0",
+        "M2 14h20v8H2z" 
+    ]
+},
+switch: { 
+    label: "Switch", color: "#0d9488", icon: "switch", type: 'node',
+    paths: [
+        "M2 6h20v8H2z", "M6 10v4", "M10 10v4", "M14 10v4", "M18 10v4", "M2 14h20v8H2z",
+        "M6 18v1", "M10 18v1", "M14 18v1", "M18 18v1"
+    ]
+},
+firewall: { 
+    label: "Firewall", color: "#dc2626", icon: "firewall", type: 'node',
+    paths: ["M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"]
+},
+modem: { 
+    label: "DSL Modem", color: "#1f2937", icon: "modem", type: 'node',
+    paths: ["M2 6h20v12H2z", "M6 12v-2", "M10 12v-2", "M14 12v-2"]
+},
+ont: { 
+    label: "Fiber Modem", color: "#db2777", icon: "ont", type: 'node',
+    paths: ["M2 12h20", "M2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6", "M12 12V8", "M12 4v4", "M12 2a2 2 0 110 4 2 2 0 010-4z"]
+},
+server: { 
+    label: "Server", color: "#9333ea", icon: "server", type: 'node',
+    paths: ["M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"]
+},
+pc: { 
+    label: "PC", color: "#374151", icon: "pc", type: 'node',
+    paths: ["M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"]
+},
+printer: { 
+    label: "Printer", color: "#475569", icon: "printer", type: 'node',
+    paths: ["M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"]
+},
+laptop: { 
+    label: "Laptop", color: "#4b5563", icon: "laptop", type: 'node',
+    paths: ["M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"] // Reusing PC for now
+},
+tablet: { 
+    label: "Tablet", color: "#f472b6", icon: "tablet", type: 'node',
+    paths: ["M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"]
+},
+smartphone: { 
+    label: "Smartphone", color: "#6366f1", icon: "smartphone", type: 'node',
+    paths: ["M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"]
+},
+curtain: { 
+    label: "Smart Curtain", color: "#f59e0b", icon: "curtain", type: 'node',
+    paths: ["M4 4h16v16H4V4zm8 0v16M4 12h16"] // Simple window
+},
+ap: { 
+    label: "Access Point", color: "#8b5cf6", icon: "ap", type: 'node',
+    paths: ["M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"]
+},
+'5g_tower': { 
+    label: "5G Tower", color: "#e11d48", icon: "tower", type: 'node',
+    paths: ["M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"]
+},
+nic: { label: "NIC", color: "#16a34a", icon: "nic", type: 'tool' },
+wnic: { label: "Wireless NIC", color: "#0ea5e9", icon: "wnic", type: 'tool' }, // New Tool
+copper: { label: "Copper", color: "#475569", icon: "copper", type: 'cable' },
+fiber: { label: "Fiber", color: "#f97316", icon: "fiber", type: 'cable' },
+wifi: { label: "Wi-Fi", color: "#3b82f6", icon: "wifi", type: 'cable' },
+radio: { label: "Radio Wave", color: "#8b5cf6", icon: "radio", type: 'cable' },
+bluetooth: { label: "Bluetooth", color: "#06b6d4", icon: "bluetooth", type: 'cable' } 
+};
+
+// --- State Management ---
+const state = {
+level: 1,
+nodes: [],
+links: [],
+packets: [],
+mode: 'move',
+activeCableType: 'copper',
+selectedNode: null,
+dragNode: null,
+dragOffset: { x: 0, y: 0 },
+lastId: 0,
+canvas: null,
+ctx: null,
+width: 0,
+height: 0,
+levelCompleted: false
+};
+
+// --- Helper Functions ---
+const getNodes = (nodes, type) => nodes.filter(n => n.type === type);
+const hasLink = (links, n1, n2) => links.some(l => (l.a === n1 && l.b === n2) || (l.a === n2 && l.b === n1));
+const checkNICs = (nodes) => {
+const needsNIC = nodes.filter(n => ['pc', 'laptop', 'server'].includes(n.type));
+return needsNIC.length > 0 && needsNIC.every(n => n.hasNIC);
+};
+
+// New function to count links for a node
+const getLinkCount = (node) => state.links.filter(l => l.a === node || l.b === node).length;
+
+// --- Validation Logic ---
+function basicValidation(nodes, links, minPC, minSw, minRtr, minMdm, minInt, cable, checkP2P) {
+const pcs = getNodes(nodes, 'pc');
+if (pcs.length < minPC) return { success: false, msg: `請至少加入 ${minPC} 部電腦。` };
+if (!checkNICs(nodes)) return { success: false, msg: "有設備尚未安裝網卡！" };
+if (links.length === 0) return { success: false, msg: "沒有連接線路！" };
+if (checkP2P) {
+const linked = links.some(l => l.a.type === 'pc' && l.b.type === 'pc');
+if(!linked) return { success: false, msg: "請直接連接兩部電腦。" };
+}
+return { success: true, msg: "配置正確！" };
+}
+
+function starTopologyValidation(nodes, links, minPC, minSw) {
+const pcs = getNodes(nodes, 'pc');
+const sws = getNodes(nodes, 'switch');
+if (pcs.length < minPC) return { success: false, msg: `請加入 ${minPC} 部電腦。` };
+if (sws.length < minSw) return { success: false, msg: "缺少交換器！" };
+if (!checkNICs(nodes)) return { success: false, msg: "網卡未安裝。" };
+
+const mainSw = sws[0];
+const connectedCount = pcs.filter(pc => hasLink(links, pc, mainSw)).length;
+if (connectedCount < minPC) return { success: false, msg: "所有電腦必須連接到交換器。" };
+return { success: true, msg: "星型結構正確！" };
+}
+
+function resourceSharingValidation(nodes, links) {
+const pcs = getNodes(nodes, 'pc');
+const prns = getNodes(nodes, 'printer');
+const sws = getNodes(nodes, 'switch');
+if (pcs.length < 2 || prns.length < 1 || sws.length < 1) return { success: false, msg: "設備不足。" };
+if (!checkNICs(nodes)) return { success: false, msg: "網卡未安裝。" };
+
+const sw = sws[0];
+const allConn = [...pcs, ...prns].every(d => hasLink(links, d, sw));
+if (!allConn) return { success: false, msg: "所有設備需連接交換器。" };
+return { success: true, msg: "共享網絡設置正確！" };
+}
+
+function daisyChainValidation(nodes, links) {
+const sws = getNodes(nodes, 'switch');
+const pcs = getNodes(nodes, 'pc');
+if (sws.length < 2 || pcs.length < 4) return { success: false, msg: "設備不足 (需 4 PC, 2 Switch)。" };
+if (!hasLink(links, sws[0], sws[1])) return { success: false, msg: "兩個交換器之間必須連接。" };
+const pcsOnSw1 = pcs.filter(p => hasLink(links, p, sws[0])).length;
+const pcsOnSw2 = pcs.filter(p => hasLink(links, p, sws[1])).length;
+if (pcsOnSw1 === 0 || pcsOnSw2 === 0) return { success: false, msg: "請將電腦分配到兩個交換器上。" };
+return { success: true, msg: "級聯成功！" };
+}
+
+function simpleRouterValidation(nodes, links) {
+const rtrs = getNodes(nodes, 'router');
+const sws = getNodes(nodes, 'switch');
+const pcs = getNodes(nodes, 'pc');
+if (rtrs.length < 1 || sws.length < 1 || pcs.length < 2) return { success: false, msg: "設備不足。" };
+if (!hasLink(links, sws[0], rtrs[0])) return { success: false, msg: "交換器必須連接路由器。" };
+if (!checkNICs(nodes)) return { success: false, msg: "網卡未安裝。" };
+return { success: true, msg: "路由器連接正確！" };
+}
+
+function modemInternetValidation(nodes, links) {
+const ints = getNodes(nodes, 'internet');
+const mdms = getNodes(nodes, 'modem');
+const rtrs = getNodes(nodes, 'router');
+if (ints.length < 1 || mdms.length < 1 || rtrs.length < 1) return { success: false, msg: "缺少關鍵設備 (Router/Modem/Internet)。" };
+if (!hasLink(links, rtrs[0], mdms[0])) return { success: false, msg: "路由器未連接數據機。" };
+if (!hasLink(links, mdms[0], ints[0])) return { success: false, msg: "數據機未連接互聯網。" };
+return { success: true, msg: "互聯網接入路徑正確！" };
+}
+
+function fullChainValidation(nodes, links) {
+const chain = ['pc', 'switch', 'router', 'modem', 'internet'];
+const exist = chain.every(t => getNodes(nodes, t).length > 0);
+if (!exist) return { success: false, msg: "請加入所有必需設備。" };
+
+const pc = getNodes(nodes, 'pc')[0];
+const sw = getNodes(nodes, 'switch')[0];
+const rtr = getNodes(nodes, 'router')[0];
+const mdm = getNodes(nodes, 'modem')[0];
+const int = getNodes(nodes, 'internet')[0];
+
+if(!hasLink(links, pc, sw)) return {success: false, msg: "PC 未連 Switch"};
+if(!hasLink(links, sw, rtr)) return {success: false, msg: "Switch 未連 Router"};
+if(!hasLink(links, rtr, mdm)) return {success: false, msg: "Router 未連 Modem"};
+if(!hasLink(links, mdm, int)) return {success: false, msg: "Modem 未連 Internet"};
+
+return { success: true, msg: "家庭網絡架構完美！" };
+}
+
+function fiberBackboneValidation(nodes, links) {
+const sws = getNodes(nodes, 'switch');
+if (sws.length < 2) return { success: false, msg: "需 2 部交換器。" };
+
+const fiberLink = links.find(l => l.a.type === 'switch' && l.b.type === 'switch' && l.cableType === 'fiber');
+if (!fiberLink) return { success: false, msg: "交換器之間必須使用「光纖」連接！" };
+
+const pcLinks = links.filter(l => (l.a.type === 'pc' || l.b.type === 'pc'));
+if (pcLinks.some(l => l.cableType === 'fiber')) return { success: false, msg: "電腦不支援直接光纖連接，請用雙扭線。" };
+
+return { success: true, msg: "光纖骨幹架設成功！" };
+}
+
+function ftthValidation(nodes, links) {
+const pcs = getNodes(nodes, 'pc');
+const sws = getNodes(nodes, 'switch');
+const rtrs = getNodes(nodes, 'router');
+const onts = getNodes(nodes, 'ont');
+const ints = getNodes(nodes, 'internet');
+
+if (pcs.length < 2) return { success: false, msg: "請至少加入 2 部電腦。" };
+if (sws.length < 1) return { success: false, msg: "缺少交換器。" };
+if (rtrs.length < 1) return { success: false, msg: "缺少路由器。" };
+if (onts.length < 1) return { success: false, msg: "缺少光纖數據機。" };
+if (ints.length < 1) return { success: false, msg: "缺少互聯網。" };
+
+// Check Links:
+const sw = sws[0];
+const rtr = rtrs[0];
+const ont = onts[0];
+const int = ints[0];
+
+// LAN
+const connectedPCs = pcs.filter(p => hasLink(links, p, sw));
+if (connectedPCs.length < 2) return { success: false, msg: "兩部電腦都必須連接到交換器。" };
+
+// Switch -> Router (Copper)
+const swRtr = links.find(l => (l.a === sw && l.b === rtr) || (l.b === sw && l.a === rtr));
+if (!swRtr) return { success: false, msg: "交換器未連接路由器。" };
+if (swRtr.cableType !== 'copper') return { success: false, msg: "交換器與路由器之間請使用雙扭線。" };
+
+// Router -> ONT (Copper)
+const rtrOnt = links.find(l => (l.a === rtr && l.b === ont) || (l.b === rtr && l.a === ont));
+if (!rtrOnt) return { success: false, msg: "路由器未連接光纖數據機。" };
+if (rtrOnt.cableType !== 'copper') return { success: false, msg: "路由器與光纖數據機之間請使用雙扭線。" };
+
+// ONT -> Internet (Fiber)
+const ontInt = links.find(l => (l.a === ont && l.b === int) || (l.b === ont && l.a === int));
+if (!ontInt) return { success: false, msg: "光纖數據機未連接互聯網。" };
+if (ontInt.cableType !== 'fiber') return { success: false, msg: "光纖數據機必須使用光纖連接互聯網。" };
+
+return { success: true, msg: "光纖入屋設置成功！" };
+}
+
+function dualLanValidation(nodes, links) {
+const rtr = getNodes(nodes, 'router')[0];
+const sws = getNodes(nodes, 'switch');
+const pcs = getNodes(nodes, 'pc');
+
+if (!rtr || sws.length < 2) return { success: false, msg: "需 1 Router 及 2 Switch。" };
+
+const connectedSws = sws.filter(sw => hasLink(links, sw, rtr));
+if (connectedSws.length < 2) return { success: false, msg: "兩個交換器都必須連接路由器。" };
+
+const sw1PCs = pcs.filter(p => hasLink(links, p, connectedSws[0]));
+const sw2PCs = pcs.filter(p => hasLink(links, p, connectedSws[1]));
+
+if (sw1PCs.length < 1 || sw2PCs.length < 1) return { success: false, msg: "每個 LAN (Switch) 需至少連接 1 部電腦。" };
+
+return { success: true, msg: "多網段架構正確！" };
+}
+
+function serverRoomValidation(nodes, links) {
+const srvs = getNodes(nodes, 'server');
+if (srvs.length < 2) return { success: false, msg: "請加入 2 部伺服器。" };
+const rtr = getNodes(nodes, 'router')[0];
+if(!rtr) return { success: false, msg: "缺少路由器。" };
+return { success: true, msg: "伺服器群組已上線！" };
+}
+
+function campusFiberValidation(nodes, links) {
+const rtr = getNodes(nodes, 'router')[0];
+const sws = getNodes(nodes, 'switch');
+if (!rtr || sws.length < 2) return { success: false, msg: "設備不足。" };
+
+const fiberLinks = links.filter(l => l.cableType === 'fiber');
+const connectedSws = sws.filter(sw =>
+fiberLinks.some(l => (l.a === sw && l.b === rtr) || (l.b === sw && l.a === rtr))
+);
+
+if (connectedSws.length < 2) return { success: false, msg: "路由器與交換器間需用光纖連接。" };
+return { success: true, msg: "校園光纖網鋪設完成！" };
+}
+
+function wanAccessValidation(nodes, links) {
+if(getNodes(nodes, 'internet').length === 0) return { success: false, msg: "缺少互聯網。" };
+if(getNodes(nodes, 'modem').length === 0) return { success: false, msg: "缺少數據機。" };
+return { success: true, msg: "WAN 連接就緒！" };
+}
+
+function wirelessLabValidation(nodes, links) {
+    const pcs = getNodes(nodes, 'pc');
+    const printers = getNodes(nodes, 'printer');
+    const tablets = getNodes(nodes, 'tablet');
+    const aps = getNodes(nodes, 'ap');
+    const switches = getNodes(nodes, 'switch');
+
+    if (pcs.length < 1) return { success: false, msg: "缺少電腦。" };
+    if (printers.length < 1) return { success: false, msg: "缺少打印機。" };
+    if (tablets.length < 1) return { success: false, msg: "缺少平板電腦。" };
+    if (aps.length < 1) return { success: false, msg: "缺少無線存取點 (AP)。" };
+    if (switches.length < 1) return { success: false, msg: "缺少交換器。" };
+
+    // Check Wired: PC -> Switch, Printer -> Switch
+    const sw = switches[0];
+    const wiredNodes = [...pcs, ...printers];
+    const wiredOk = wiredNodes.every(n => {
+        const link = links.find(l => (l.a === n && l.b === sw) || (l.b === n && l.a === sw));
+        return link && link.cableType === 'copper';
+    });
+    if (!wiredOk) return { success: false, msg: "電腦和打印機需用雙扭線連接到交換器。" };
+
+    // Check Backhaul: AP -> Switch (Copper)
+    const ap = aps[0];
+    const apLink = links.find(l => (l.a === ap && l.b === sw) || (l.b === ap && l.a === sw));
+    if (!apLink || apLink.cableType !== 'copper') return { success: false, msg: "AP 需用雙扭線連接到交換器。" };
+
+    // Check Wireless: Tablet -> AP (WiFi)
+    const tablet = tablets[0];
+    const wifiLink = links.find(l => (l.a === tablet && l.b === ap) || (l.b === tablet && l.a === ap));
+    if (!wifiLink || wifiLink.cableType !== 'wifi') return { success: false, msg: "平板電腦需用 WiFi 連接到 AP。" };
+
+    return { success: true, msg: "無線網絡配置正確！" };
+}
+
+function enterpriseValidation(nodes, links) {
+const types = ['pc', 'server', 'printer', 'switch', 'router', 'modem', 'internet'];
+const missing = types.filter(t => getNodes(nodes, t).length === 0);
+if (missing.length > 0) return { success: false, msg: "缺少設備: " + missing.join(',') };
+
+const rtr = getNodes(nodes, 'router')[0];
+const sws = getNodes(nodes, 'switch');
+const hasFiberCore = sws.some(sw => links.some(l => l.cableType === 'fiber' && ((l.a === sw && l.b === rtr) || (l.b === sw && l.a === rtr))));
+
+if (!hasFiberCore) return { success: false, msg: "核心鏈路 (Router-Switch) 建議使用光纖。" };
+return { success: true, msg: "企業網絡架設完美！" };
+}
+
+function firewallValidation(nodes, links) {
+    const pcs = getNodes(nodes, 'pc');
+    const srvs = getNodes(nodes, 'server');
+    const sws = getNodes(nodes, 'switch');
+    const rtrs = getNodes(nodes, 'router');
+    const fws = getNodes(nodes, 'firewall');
+    const mdms = getNodes(nodes, 'modem');
+    const ints = getNodes(nodes, 'internet');
+
+    if (pcs.length < 2) return { success: false, msg: "缺少電腦 (需 2 部)。" };
+    if (srvs.length < 1) return { success: false, msg: "缺少伺服器。" };
+    if (sws.length < 1) return { success: false, msg: "缺少交換器。" };
+    if (rtrs.length < 1) return { success: false, msg: "缺少路由器。" };
+    if (fws.length < 1) return { success: false, msg: "缺少防火牆。" };
+    if (mdms.length < 1) return { success: false, msg: "缺少數據機。" };
+    if (ints.length < 1) return { success: false, msg: "缺少互聯網。" };
+
+    const sw = sws[0];
+    const rtr = rtrs[0];
+    const fw = fws[0];
+    const mdm = mdms[0];
+    const int = ints[0];
+
+    // Check LAN
+    const lanNodes = [...pcs, ...srvs];
+    if (!lanNodes.every(n => hasLink(links, n, sw))) return { success: false, msg: "電腦和伺服器需連接到交換器。" };
+
+    // New Chain: Switch -> Firewall -> Router -> Modem -> Internet
+
+    // 1. Switch -> Firewall
+    const swFw = links.find(l => (l.a === sw && l.b === fw) || (l.b === sw && l.a === fw));
+    if (!swFw) return { success: false, msg: "交換器未連接防火牆。" };
+
+    // 2. Firewall -> Router
+    const fwRtr = links.find(l => (l.a === fw && l.b === rtr) || (l.b === fw && l.a === rtr));
+    if (!fwRtr) return { success: false, msg: "防火牆未連接路由器。" };
+
+    // 3. Router -> Modem
+    const rtrMdm = links.find(l => (l.a === rtr && l.b === mdm) || (l.b === rtr && l.a === mdm));
+    if (!rtrMdm) return { success: false, msg: "路由器未連接數據機。" };
+
+    // 4. Modem -> Internet
+    const mdmInt = links.find(l => (l.a === mdm && l.b === int) || (l.b === mdm && l.a === int));
+    if (!mdmInt) return { success: false, msg: "數據機未連接互聯網。" };
+
+    return { success: true, msg: "安全網絡架構部署完成！" };
+}
+
+function _5gValidation(nodes, links) {
+    const phones = getNodes(nodes, 'smartphone');
+    const towers = getNodes(nodes, '5g_tower');
+    const ints = getNodes(nodes, 'internet');
+
+    if (phones.length < 2) return { success: false, msg: "請加入最少 2 部智能電話。" };
+    if (towers.length < 2) return { success: false, msg: "請加入最少 2 個 5G 發射站。" };
+    if (ints.length < 1) return { success: false, msg: "缺少互聯網。" };
+
+    const int = ints[0];
+
+    // Map to store which tower each phone is connected to
+    const phoneConnections = new Map();
+
+    // 1. Check Phone -> Tower connections (Radio)
+    phones.forEach(phone => {
+        const link = links.find(l => 
+            (l.a === phone && towers.includes(l.b) && l.cableType === 'radio') || 
+            (l.b === phone && towers.includes(l.a) && l.cableType === 'radio')
+        );
+        if (link) {
+            const tower = (link.a === phone) ? link.b : link.a;
+            phoneConnections.set(phone, tower);
+        }
+    });
+
+    if (phoneConnections.size < 2) return { success: false, msg: "兩部手機都必須連接到發射站。" };
+
+    // Check if connected to DIFFERENT towers
+    const usedTowers = new Set(phoneConnections.values());
+    if (usedTowers.size < 2) return { success: false, msg: "為了測試漫遊，請將兩部手機連接到「不同」的發射站。" };
+
+    // 2. Check Tower -> Internet connections (Fiber)
+    // We only care about the towers that are actually used by phones
+    let allTowersConnected = true;
+    usedTowers.forEach(tower => {
+        const backhaul = links.find(l => 
+            (l.a === tower && l.b === int && l.cableType === 'fiber') || 
+            (l.b === tower && l.a === int && l.cableType === 'fiber')
+        );
+        if (!backhaul) allTowersConnected = false;
+    });
+
+    if (!allTowersConnected) return { success: false, msg: "所有使用中的 5G 發射站都必須用「光纖」連接互聯網。" };
+
+    return { success: true, msg: "跨基站 5G 網絡已就緒！" };
+}
+
+function bluetoothValidation(nodes, links) {
+    const phones = getNodes(nodes, 'smartphone');
+    if (phones.length < 2) return { success: false, msg: "需最少 2 部智能電話。" };
+    
+    // Check for direct bluetooth link
+    const btLink = links.find(l => 
+        l.cableType === 'bluetooth' && 
+        l.a.type === 'smartphone' && 
+        l.b.type === 'smartphone'
+    );
+    
+    if (!btLink) return { success: false, msg: "兩部手機需使用「藍芽」進行配對連接。" };
+    
+    return { success: true, msg: "藍芽配對成功！" };
+}
+
+function iotValidation(nodes, links) {
+    const srvs = getNodes(nodes, 'server');
+    const sws = getNodes(nodes, 'switch');
+    const curtains = getNodes(nodes, 'curtain');
+    const aps = getNodes(nodes, 'ap');
+    const rtrs = getNodes(nodes, 'router');
+    const mdms = getNodes(nodes, 'modem');
+    const ints = getNodes(nodes, 'internet');
+    const phones = getNodes(nodes, 'smartphone');
+    const towers = getNodes(nodes, '5g_tower');
+
+    if (srvs.length < 1) return { success: false, msg: "缺少伺服器。" };
+    if (sws.length < 1) return { success: false, msg: "缺少交換器。" };
+    if (curtains.length < 1) return { success: false, msg: "缺少智能窗簾。" };
+    if (aps.length < 1) return { success: false, msg: "缺少無線存取點 (AP)。" };
+    if (rtrs.length < 1) return { success: false, msg: "缺少路由器。" };
+    if (mdms.length < 1) return { success: false, msg: "缺少數據機。" };
+    if (ints.length < 1) return { success: false, msg: "缺少互聯網。" };
+    if (phones.length < 1) return { success: false, msg: "缺少智能電話。" };
+    if (towers.length < 1) return { success: false, msg: "缺少 5G 發射站。" };
+
+    const server = srvs[0]; const sw = sws[0]; const curtain = curtains[0];
+    const ap = aps[0]; const rtr = rtrs[0]; const mdm = mdms[0];
+    const int = ints[0]; const phone = phones[0]; const tower = towers[0];
+
+    // 1. Server -> Switch (Copper)
+    if (!hasLink(links, server, sw)) return { success: false, msg: "伺服器未連接交換器。" };
+
+    // 2. Curtain -> AP (WiFi) -> Switch (Copper)
+    const curtainAP = links.find(l => (l.a === curtain && l.b === ap) || (l.b === curtain && l.a === ap));
+    if (!curtainAP || curtainAP.cableType !== 'wifi') return { success: false, msg: "智能窗簾需用 Wi-Fi 連接 AP。" };
+    if (!hasLink(links, ap, sw)) return { success: false, msg: "AP 未連接交換器。" };
+
+    // 3. Switch -> Router -> Modem -> Internet (Copper/Fiber mix logic from L12/L10)
+    // Assuming standard Copper chain for simplicity based on prompt description "Switch connected to Router connected to Modem connected to Internet"
+    if (!hasLink(links, sw, rtr)) return { success: false, msg: "交換器未連接路由器。" };
+    if (!hasLink(links, rtr, mdm)) return { success: false, msg: "路由器未連接數據機。" };
+    if (!hasLink(links, mdm, int)) return { success: false, msg: "數據機未連接互聯網。" };
+
+    // 4. Smartphone -> 5G Tower (Radio) -> Internet (Fiber)
+    const phoneTower = links.find(l => (l.a === phone && l.b === tower) || (l.b === phone && l.a === tower));
+    if (!phoneTower || phoneTower.cableType !== 'radio') return { success: false, msg: "手機需用無線電波連接 5G 發射站。" };
+    
+    const towerInt = links.find(l => (l.a === tower && l.b === int) || (l.b === tower && l.a === int));
+    if (!towerInt || towerInt.cableType !== 'fiber') return { success: false, msg: "5G 發射站需用光纖連接互聯網。" };
+
+    return { success: true, msg: "IoT 智能家居網絡架設成功！" };
+}
+
+// --- Levels Configuration with Dynamic Checks ---
+const LEVELS = {
+1: {
+name: "第 1 關：點對點網絡 (P2P)",
+desc: "歡迎！我們從最簡單的網絡開始：直接使用雙扭線連接兩部電腦。",
+color: "blue",
+tools: ['pc', 'nic', 'copper'],
+goals: [
+{ id: 'l1-pc', text: "加入 2 部電腦", check: (n, l) => getNodes(n, 'pc').length >= 2 },
+{ id: 'l1-nic', text: "為每部電腦安裝網卡", check: (n, l) => getNodes(n, 'pc').length >= 2 && checkNICs(n) },
+{ id: 'l1-link', text: "用雙扭線連接電腦", check: (n, l) => l.length >= 1 },
+{ id: 'l1-test', text: "測試通訊 (Ping)", check: (n, l) => state.levelCompleted }
+],
+validate: (nodes, links) => basicValidation(nodes, links, 2, 0, 0, 0, 0, 'copper', true)
+},
+2: {
+name: "第 2 關：星型網絡 (Star Topology)",
+desc: "當電腦增多時，我們需要「交換器」來集中管理數據。",
+color: "teal",
+tools: ['pc', 'nic', 'switch', 'copper'],
+goals: [
+{ id: 'l2-pc', text: "加入 3 部電腦", check: (n, l) => getNodes(n, 'pc').length >= 3 },
+{ id: 'l2-sw', text: "加入 1 部交換器", check: (n, l) => getNodes(n, 'switch').length >= 1 },
+{ id: 'l2-link', text: "將電腦連接至交換器", check: (n, l) => l.filter(link => link.a.type === 'switch' || link.b.type === 'switch').length >= 3 },
+{ id: 'l2-test', text: "測試全網通訊", check: (n, l) => state.levelCompleted }
+],
+validate: (nodes, links) => starTopologyValidation(nodes, links, 3, 1)
+},
+3: {
+name: "第 3 關：資源共享",
+desc: "加入打印機，讓多部電腦共享資源。",
+color: "slate",
+tools: ['pc', 'nic', 'switch', 'printer', 'copper'],
+goals: [
+{ id: 'l3-pc', text: "加入 2 部電腦", check: (n, l) => getNodes(n, 'pc').length >= 2 },
+{ id: 'l3-prn', text: "加入 1 部打印機", check: (n, l) => getNodes(n, 'printer').length >= 1 },
+{ id: 'l3-sw', text: "加入 1 部交換器", check: (n, l) => getNodes(n, 'switch').length >= 1 },
+{ id: 'l3-test', text: "測試打印傳輸", check: (n, l) => state.levelCompleted }
+],
+validate: (nodes, links) => resourceSharingValidation(nodes, links)
+},
+4: {
+name: "第 4 關：交換器級聯",
+desc: "當端口不足時，我們可以連接多個交換器來擴展網絡。",
+color: "teal",
+tools: ['pc', 'nic', 'switch', 'copper'],
+goals: [
+{ id: 'l4-pc', text: "加入 4 部電腦", check: (n, l) => getNodes(n, 'pc').length >= 4 },
+{ id: 'l4-sw', text: "加入 2 部交換器", check: (n, l) => getNodes(n, 'switch').length >= 2 },
+{ id: 'l4-link', text: "連接所有設備", check: (n, l) => l.length >= 5 },
+{ id: 'l4-test', text: "測試跨交換器通訊", check: (n, l) => state.levelCompleted }
+],
+validate: (nodes, links) => daisyChainValidation(nodes, links)
+},
+5: {
+name: "第 5 關：路由器 (Router) 登場",
+desc: "交換器只能在內部傳輸。要連接不同網絡，你需要「路由器」。",
+color: "indigo",
+tools: ['pc', 'nic', 'switch', 'router', 'copper'],
+goals: [
+{
+id: 'l5-lan',
+text: "為2部電腦建立1個LAN",
+check: (n, l) => {
+const switches = getNodes(n, 'switch');
+if (switches.length === 0) return false;
+return switches.some(sw => {
+const connectedPCs = getNodes(n, 'pc').filter(pc =>
+l.some(link => (link.a === sw && link.b === pc) || (link.b === sw && link.a === pc))
+);
+return connectedPCs.length >= 2;
+});
+}
+},
+{ id: 'l5-router', text: "加入 1 部路由器", check: (n, l) => getNodes(n, 'router').length >= 1 },
+{ id: 'l5-link', text: "將交換器連接至路由器", check: (n, l) => l.some(link => (link.a.type === 'switch' && link.b.type === 'router') || (link.b.type === 'switch' && link.a.type === 'router')) },
+{ id: 'l5-test', text: "測試通訊", check: (n, l) => state.levelCompleted }
+],
+validate: (nodes, links) => simpleRouterValidation(nodes, links)
+},
+6: {
+name: "第 6 關：雙子網絡 (Dual LANs)",
+desc: "路由器連接著兩個獨立的區域網絡 (LAN)。",
+color: "indigo",
+tools: ['pc', 'nic', 'switch', 'router', 'copper'],
+goals: [
+{
+id: 'l6-lan1',
+text: "左側 LAN (Switch) ，最少包含1部電腦",
+check: (n, l) => {
+const sws = getNodes(n, 'switch');
+const pcs = getNodes(n, 'pc');
+return sws.some(sw => pcs.filter(p => hasLink(l, p, sw)).length >= 1);
+}
+},
+{
+id: 'l6-lan2',
+text: "右側 LAN (Switch) ，最少包含1部電腦",
+check: (n, l) => {
+const sws = getNodes(n, 'switch');
+const pcs = getNodes(n, 'pc');
+const switchesWithPCs = sws.filter(sw => pcs.filter(p => hasLink(l, p, sw)).length >= 1);
+return switchesWithPCs.length >= 2;
+}
+},
+{ id: 'l6-router', text: "交換器連至同一 Router", check: (n, l) => getNodes(n, 'router').length >= 1 && l.filter(link => (link.a.type === 'switch' && link.b.type === 'router') || (link.b.type === 'switch' && link.a.type === 'router')).length >= 2 },
+{ id: 'l6-test', text: "測試跨網段通訊", check: (n, l) => state.levelCompleted }
+],
+validate: (nodes, links) => dualLanValidation(nodes, links)
+},
+7: {
+name: "第 7 關：多樓層伺服器網絡",
+desc: "模擬一間兩層樓的公司網絡。1樓是列印中心，2樓是辦公室與檔案室，中間透過路由器連接。",
+color: "purple",
+tools: ['pc', 'server', 'printer', 'nic', 'switch', 'router', 'copper'],
+goals: [
+{
+id: 'l7-f1',
+text: "1樓：加入打印機、列印伺服器及交換器",
+check: (n, l) => {
+const sws = getNodes(n, 'switch');
+return sws.some(sw => {
+const hasPrn = getNodes(n, 'printer').some(p => hasLink(l, p, sw));
+const hasSrv = getNodes(n, 'server').some(s => hasLink(l, s, sw));
+return hasPrn && hasSrv;
+});
+}
+},
+{
+id: 'l7-f2',
+text: "2樓：加入檔案伺服器、電腦及交換器",
+check: (n, l) => {
+const sws = getNodes(n, 'switch');
+return sws.some(sw => {
+const hasPC = getNodes(n, 'pc').some(p => hasLink(l, p, sw));
+const hasSrv = getNodes(n, 'server').some(s => hasLink(l, s, sw));
+return hasPC && hasSrv;
+});
+}
+},
+{
+id: 'l7-router',
+text: "把2個交換器連接到路由器",
+check: (n, l) => {
+const rtr = getNodes(n, 'router')[0];
+if(!rtr) return false;
+const connectedSws = getNodes(n, 'switch').filter(sw => hasLink(l, sw, rtr));
+return connectedSws.length >= 2;
+}
+},
+{ id: 'l7-test', text: "測試存取檔案伺服器和使用打印服務", check: (n, l) => state.levelCompleted }
+],
+validate: (nodes, links) => {
+    const pcs = getNodes(nodes, 'pc');
+    const servers = getNodes(nodes, 'server');
+    const printers = getNodes(nodes, 'printer');
+    const switches = getNodes(nodes, 'switch');
+    const routers = getNodes(nodes, 'router');
+
+    if (pcs.length < 1) return { success: false, msg: "缺少電腦 (2樓)。" };
+    if (servers.length < 2) return { success: false, msg: "需要 2 部伺服器 (檔案+列印)。" };
+    if (printers.length < 1) return { success: false, msg: "缺少打印機 (1樓)。" };
+    if (switches.length < 2) return { success: false, msg: "需要 2 個交換器 (每樓層一個)。" };
+    if (routers.length < 1) return { success: false, msg: "缺少路由器。" };
+
+    if (!checkNICs(nodes)) return { success: false, msg: "有設備未安裝網卡。" };
+
+    const router = routers[0];
+    const f1Switch = switches.find(sw => printers.some(p => hasLink(links, p, sw)) && servers.some(s => hasLink(links, s, sw)));
+    const f2Switch = switches.find(sw => pcs.some(p => hasLink(links, p, sw)) && servers.some(s => hasLink(links, s, sw)));
+
+    if (!f1Switch) return { success: false, msg: "1樓配置錯誤：交換器需連接打印機和伺服器。" };
+    if (!f2Switch) return { success: false, msg: "2樓配置錯誤：交換器需連接電腦和伺服器。" };
+    if (f1Switch === f2Switch) return { success: false, msg: "請使用兩個不同的交換器代表不同樓層。" };
+    if (!hasLink(links, f1Switch, router)) return { success: false, msg: "1樓交換器未連接路由器。" };
+    if (!hasLink(links, f2Switch, router)) return { success: false, msg: "2樓交換器未連接路由器。" };
+
+    return { success: true, msg: "多樓層網絡架構正確！" };
+}
+},
+8: {
+    name: "第 8 關：連接互聯網 (Modem)",
+    desc: "要上網，我們需要「數據機 (Modem)」將數字信號轉換為模擬信號。",
+    color: "gray",
+    tools: ['pc', 'nic', 'switch', 'router', 'modem', 'internet', 'copper'],
+    goals: [
+        { 
+            id: 'l8-dev', 
+            text: "路由器 -> 數據機 -> 互聯網", 
+            check: (n, l) => {
+                const rtrs = getNodes(n, 'router');
+                const mdms = getNodes(n, 'modem');
+                const ints = getNodes(n, 'internet');
+                if (rtrs.length === 0 || mdms.length === 0 || ints.length === 0) return false;
+                return rtrs.some(r => mdms.some(m => ints.some(i => hasLink(l, r, m) && hasLink(l, m, i))));
+            }
+        },
+        { id: 'l8-lan', text: "PC 連接至 路由器", check: (n, l) => getNodes(n, 'pc').length > 0 && l.length >= 3 },
+        { id: 'l8-test', text: "測試上網連接", check: (n, l) => state.levelCompleted }
+    ],
+    validate: (nodes, links) => modemInternetValidation(nodes, links)
+},
+9: {
+    name: "第 9 關：家庭網絡實戰",
+    desc: "綜合運用：建立一個標準的家庭網絡架構。首先建立內部網絡(LAN)，然後連接到互聯網(WAN)。",
+    color: "blue",
+    tools: ['pc', 'nic', 'switch', 'router', 'modem', 'internet', 'copper'],
+    goals: [
+        { 
+            id: 'l9-lan', 
+            text: "加入2部電腦及交換器，建立LAN", 
+            check: (n, l) => {
+                const pcs = getNodes(n, 'pc');
+                const sws = getNodes(n, 'switch');
+                if (pcs.length < 2 || sws.length < 1) return false;
+                const sw = sws[0];
+                const connectedPCs = pcs.filter(p => hasLink(l, p, sw));
+                return connectedPCs.length >= 2;
+            }
+        },
+        { 
+            id: 'l9-wan', 
+            text: "交換器->路由器->數據機->互聯網", 
+            check: (n, l) => {
+                const sws = getNodes(n, 'switch');
+                const rtrs = getNodes(n, 'router');
+                const mdms = getNodes(n, 'modem');
+                const ints = getNodes(n, 'internet');
+                if (sws.length < 1 || rtrs.length < 1 || mdms.length < 1 || ints.length < 1) return false;
+                const sw = sws[0];
+                const rtr = rtrs[0];
+                const mdm = mdms[0];
+                const int = ints[0];
+                return hasLink(l, sw, rtr) && hasLink(l, rtr, mdm) && hasLink(l, mdm, int);
+            }
+        },
+        { id: 'l9-test', text: "測試完整路徑", check: (n, l) => state.levelCompleted }
+    ],
+    validate: (nodes, links) => {
+        const pcs = getNodes(nodes, 'pc');
+        const sws = getNodes(nodes, 'switch');
+        const rtrs = getNodes(nodes, 'router');
+        const mdms = getNodes(nodes, 'modem');
+        const ints = getNodes(nodes, 'internet');
+
+        if (pcs.length < 2) return { success: false, msg: "請至少加入 2 部電腦。" };
+        if (sws.length < 1) return { success: false, msg: "缺少交換器。" };
+        if (rtrs.length < 1) return { success: false, msg: "缺少路由器。" };
+        if (mdms.length < 1) return { success: false, msg: "缺少數據機。" };
+        if (ints.length < 1) return { success: false, msg: "缺少互聯網。" };
+
+        if (!checkNICs(nodes)) return { success: false, msg: "有電腦未安裝網卡。" };
+
+        const sw = sws[0];
+        const rtr = rtrs[0];
+        const mdm = mdms[0];
+        const int = ints[0];
+
+        const connectedPCs = pcs.filter(p => hasLink(links, p, sw));
+        if (connectedPCs.length < 2) return { success: false, msg: "兩部電腦都必須連接到交換器。" };
+        
+        if (!hasLink(links, sw, rtr)) return { success: false, msg: "交換器未連接路由器。" };
+        if (!hasLink(links, rtr, mdm)) return { success: false, msg: "路由器未連接數據機。" };
+        if (!hasLink(links, mdm, int)) return { success: false, msg: "數據機未連接互聯網。" };
+
+        return { success: true, msg: "家庭網絡設置成功！" };
+    }
+},
+10: {
+    name: "第 10 關：光纖入屋",
+    desc: "現代家庭常使用光纖連接互聯網。請使用「光纖數據機」和適當的線材。",
+    color: "pink",
+    tools: ['pc', 'nic', 'switch', 'router', 'ont', 'internet', 'copper', 'fiber'],
+    goals: [
+        { 
+            id: 'l10-lan', 
+            text: "加入2部電腦及交換器，建立LAN", 
+            check: (n, l) => {
+                const pcs = getNodes(n, 'pc');
+                const sws = getNodes(n, 'switch');
+                if (pcs.length < 2 || sws.length < 1) return false;
+                return pcs.filter(p => hasLink(l, p, sws[0])).length >= 2;
+            }
+        },
+        { 
+            id: 'l10-wan', 
+            text: "Switch->Router->Fiber Modem->Internet", 
+            check: (n, l) => {
+                const sws = getNodes(n, 'switch');
+                const rtrs = getNodes(n, 'router');
+                const onts = getNodes(n, 'ont');
+                const ints = getNodes(n, 'internet');
+                if (!sws.length || !rtrs.length || !onts.length || !ints.length) return false;
+                
+                const rtrOnt = l.find(link => (link.a === rtrs[0] && link.b === onts[0]) || (link.b === rtrs[0] && link.a === onts[0]));
+                const ontInt = l.find(link => (link.a === onts[0] && link.b === ints[0]) || (link.b === onts[0] && link.a === ints[0]));
+                const swRtr = l.find(link => (link.a === sws[0] && link.b === rtrs[0]) || (link.b === sws[0] && link.a === rtrs[0]));
+                
+                if (!rtrOnt || !ontInt || !swRtr) return false;
+                return rtrOnt.cableType === 'copper' && ontInt.cableType === 'fiber';
+            }
+        },
+        { id: 'l10-test', text: "測試完整路徑", check: (n, l) => state.levelCompleted }
+    ],
+    validate: (nodes, links) => ftthValidation(nodes, links)
+},
+11: {
+    name: "第 11 關：無線區域網絡 (WLAN)",
+    desc: "學習如何結合有線和無線網絡。你需要加入無線存取點 (AP) 來連接平板電腦。",
+    color: "purple",
+    tools: ['pc', 'printer', 'tablet', 'switch', 'ap', 'nic', 'wnic', 'copper', 'wifi'],
+    goals: [
+        { 
+            id: 'l11-wired', 
+            text: "加入 PC 及打印機，並連接到交換器 (雙扭線)", 
+            check: (n, l) => {
+                const sws = getNodes(n, 'switch');
+                const pcs = getNodes(n, 'pc');
+                const prns = getNodes(n, 'printer');
+                if(!sws.length) return false;
+                const sw = sws[0];
+                return pcs.some(p => hasLink(l, p, sw)) && prns.some(p => hasLink(l, p, sw));
+            }
+        },
+        { 
+            id: 'l11-ap', 
+            text: "加入 AP，並用雙扭線連接到交換器", 
+            check: (n, l) => {
+                const sws = getNodes(n, 'switch');
+                const aps = getNodes(n, 'ap');
+                if(!sws.length || !aps.length) return false;
+                const link = l.find(link => (link.a === sws[0] && link.b === aps[0]) || (link.b === sws[0] && link.a === aps[0]));
+                return link && link.cableType === 'copper';
+            }
+        },
+        { 
+            id: 'l11-wifi', 
+            text: "加入平板電腦，並用 WiFi 連接到 AP", 
+            check: (n, l) => {
+                const aps = getNodes(n, 'ap');
+                const tabs = getNodes(n, 'tablet');
+                if(!aps.length || !tabs.length) return false;
+                const link = l.find(link => (link.a === aps[0] && link.b === tabs[0]) || (link.b === aps[0] && link.a === tabs[0]));
+                return link && link.cableType === 'wifi';
+            }
+        },
+        { id: 'l11-test', text: "測試通訊", check: (n, l) => state.levelCompleted }
+    ],
+    validate: (nodes, links) => wirelessLabValidation(nodes, links)
+},
+12: {
+    name: "第 12 關：網絡安全防護",
+    desc: "為了保護企業內部網絡，我們將「防火牆」放置在交換器和路由器之間，監控進出內網的流量。",
+    color: "red",
+    tools: ['pc', 'server', 'switch', 'router', 'firewall', 'modem', 'internet', 'nic', 'copper'],
+    goals: [
+        { 
+            id: 'l12-lan', 
+            text: "建立內部網絡 (1 Server, 2 PC -> Switch)", 
+            check: (n, l) => {
+                const sws = getNodes(n, 'switch');
+                if(!sws.length) return false;
+                const sw = sws[0];
+                const srv = getNodes(n, 'server');
+                const pcs = getNodes(n, 'pc');
+                return srv.length >= 1 && pcs.length >= 2 && 
+                       srv.every(s => hasLink(l, s, sw)) && 
+                       pcs.every(p => hasLink(l, p, sw));
+            }
+        },
+        { 
+            id: 'l12-sec', 
+            text: "部署防火牆 (Switch -> Firewall)", 
+            check: (n, l) => {
+                const sws = getNodes(n, 'switch');
+                const fws = getNodes(n, 'firewall');
+                if(!sws.length || !fws.length) return false;
+                return hasLink(l, sws[0], fws[0]);
+            }
+        },
+        { 
+            id: 'l12-gw', 
+            text: "連接網關 (Firewall -> Router)", 
+            check: (n, l) => {
+                const rtrs = getNodes(n, 'router');
+                const fws = getNodes(n, 'firewall');
+                if(!rtrs.length || !fws.length) return false;
+                return hasLink(l, fws[0], rtrs[0]);
+            }
+        },
+        { 
+            id: 'l12-wan', 
+            text: "連接外網 (Router -> Modem -> Internet)", 
+            check: (n, l) => {
+                const rtrs = getNodes(n, 'router');
+                const mdms = getNodes(n, 'modem');
+                const ints = getNodes(n, 'internet');
+                if(!rtrs.length || !mdms.length || !ints.length) return false;
+                const rtr = rtrs[0]; const mdm = mdms[0]; const int = ints[0];
+                return hasLink(l, rtr, mdm) && hasLink(l, mdm, int);
+            }
+        },
+        { id: 'l12-test', text: "測試安全連線", check: (n, l) => state.levelCompleted }
+    ],
+    validate: (nodes, links) => firewallValidation(nodes, links)
+},
+13: {
+    name: "第 13 關：5G 跨區通訊",
+    desc: "模擬真實流動網絡：建立兩個基站覆蓋不同區域，讓兩部手機透過互聯網骨幹進行通訊。",
+    color: "purple",
+    tools: ['smartphone', '5g_tower', 'internet', 'radio', 'fiber'],
+    goals: [
+        { 
+            id: 'l13-phone', 
+            text: "加入 2 部智能電話", 
+            check: (n, l) => getNodes(n, 'smartphone').length >= 2 
+        },
+        { 
+            id: 'l13-tower', 
+            text: "加入 2 個 5G 發射站", 
+            check: (n, l) => getNodes(n, '5g_tower').length >= 2 
+        },
+        { 
+            id: 'l13-radio', 
+            text: "手機連接不同基站 (無線電波)", 
+            check: (n, l) => {
+                const phones = getNodes(n, 'smartphone');
+                const towers = getNodes(n, '5g_tower');
+                if(phones.length < 2 || towers.length < 2) return false;
+                
+                // Count how many distinct towers are connected to phones
+                const connectedTowers = new Set();
+                phones.forEach(p => {
+                    const link = l.find(li => (li.a === p && towers.includes(li.b)) || (li.b === p && towers.includes(li.a)));
+                    if(link && link.cableType === 'radio') {
+                        connectedTowers.add(link.a === p ? link.b : link.a);
+                    }
+                });
+                return connectedTowers.size >= 2;
+            }
+        },
+        { 
+            id: 'l13-backhaul', 
+            text: "所有基站 <-> 互聯網 (光纖)", 
+            check: (n, l) => {
+                const towers = getNodes(n, '5g_tower');
+                const ints = getNodes(n, 'internet');
+                if(towers.length < 2 || !ints.length) return false;
+                const int = ints[0];
+                
+                // Check if BOTH towers are connected to internet
+                return towers.every(t => 
+                    l.some(li => (li.a === t && li.b === int) || (li.b === t && li.a === int))
+                );
+            }
+        },
+        { id: 'l13-test', text: "測試手機間通訊", check: (n, l) => state.levelCompleted }
+    ],
+    validate: (nodes, links) => _5gValidation(nodes, links)
+},
+14: {
+    name: "第 14 關：藍芽配對 (Bluetooth)",
+    desc: "藍芽是一種短距離無線技術。請嘗試直接連接兩部手機進行檔案傳輸。",
+    color: "cyan",
+    tools: ['smartphone', 'bluetooth'],
+    goals: [
+        { 
+            id: 'l14-phone', 
+            text: "加入 2 部智能電話", 
+            check: (n, l) => getNodes(n, 'smartphone').length >= 2 
+        },
+        { 
+            id: 'l14-link', 
+            text: "直接配對 (使用藍芽連接)", 
+            check: (n, l) => {
+                const phones = getNodes(n, 'smartphone');
+                if(phones.length < 2) return false;
+                return l.some(link => 
+                    link.cableType === 'bluetooth' && 
+                    link.a.type === 'smartphone' && 
+                    link.b.type === 'smartphone'
+                );
+            }
+        },
+        { id: 'l14-test', text: "測試傳輸", check: (n, l) => state.levelCompleted }
+    ],
+    validate: (nodes, links) => bluetoothValidation(nodes, links)
+},
+15: {
+    name: "第 15 關：物聯網 (IoT) 智能家居",
+    desc: "萬物互聯！透過手機遠端控制家中的智能窗簾，同時確保伺服器能收集數據。",
+    color: "amber",
+    tools: ['server', 'switch', 'curtain', 'ap', 'router', 'modem', 'internet', 'smartphone', '5g_tower', 'nic', 'copper', 'fiber', 'wifi', 'radio'],
+    goals: [
+        { id: 'l15-server', text: "伺服器 -> 交換器", check: (n, l) => getNodes(n,'server').length && getNodes(n,'switch').length && hasLink(l, getNodes(n,'server')[0], getNodes(n,'switch')[0]) },
+        { id: 'l15-iot', text: "窗簾 -> AP -> 交換器", check: (n, l) => {
+            const c = getNodes(n,'curtain')[0]; const ap = getNodes(n,'ap')[0]; const sw = getNodes(n,'switch')[0];
+            if(!c || !ap || !sw) return false;
+            return hasLink(l, c, ap) && hasLink(l, ap, sw);
+        }},
+        { id: 'l15-backbone', text: "交換器->Router->Modem->Internet", check: (n, l) => {
+             const sw = getNodes(n,'switch')[0]; const r = getNodes(n,'router')[0]; const m = getNodes(n,'modem')[0]; const i = getNodes(n,'internet')[0];
+             if(!sw || !r || !m || !i) return false;
+             return hasLink(l, sw, r) && hasLink(l, r, m) && hasLink(l, m, i);
+        }},
+        { id: 'l15-mobile', text: "手機 -> 5G基站 -> Internet", check: (n, l) => {
+             const p = getNodes(n,'smartphone')[0]; const t = getNodes(n,'5g_tower')[0]; const i = getNodes(n,'internet')[0];
+             if(!p || !t || !i) return false;
+             return hasLink(l, p, t) && hasLink(l, t, i);
+        }},
+        { id: 'l15-test', text: "測試遠端控制", check: (n, l) => state.levelCompleted }
+    ],
+    validate: (nodes, links) => iotValidation(nodes, links)
+}
+};
+
+// --- Game Logic Classes ---
+class Node {
+constructor(type, x, y) {
+this.id = ++state.lastId;
+this.type = type;
+this.x = x;
+this.y = y;
+this.r = 30;
+this.label = DEVICES[type].label;
+// Auto-install NIC for tablet & smartphone. Also curtain is wireless native.
+this.hasNIC = false; 
+this.hasWirelessNIC = ['smartphone', 'tablet', 'curtain'].includes(type) ? true : false;
+}
+draw(ctx) {
+ctx.shadowColor = "rgba(0,0,0,0.1)";
+ctx.shadowBlur = 10;
+ctx.shadowOffsetY = 4;
+ctx.beginPath();
+ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+ctx.fillStyle = "white";
+ctx.fill();
+
+ctx.lineWidth = 3;
+if (state.selectedNode === this && state.mode === 'connect') {
+ctx.strokeStyle = COLORS.selected;
+const pulse = (Math.sin(Date.now() / 200) + 1) * 5;
+ctx.beginPath();
+ctx.arc(this.x, this.y, this.r + pulse, 0, Math.PI * 2);
+if (state.activeCableType === 'fiber') ctx.strokeStyle = COLORS.linkFiber;
+else if (state.activeCableType === 'wifi') ctx.strokeStyle = COLORS.linkWifi;
+else if (state.activeCableType === 'radio') ctx.strokeStyle = COLORS.linkRadio;
+else if (state.activeCableType === 'bluetooth') ctx.strokeStyle = COLORS.linkBluetooth;
+else ctx.strokeStyle = "rgba(59, 130, 246, 0.4)";
+ctx.stroke();
+} else {
+ctx.strokeStyle = DEVICES[this.type].color;
+}
+
+ctx.beginPath();
+ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+ctx.strokeStyle = DEVICES[this.type].color;
+ctx.stroke();
+
+// Draw Icon from Paths
+const paths = DEVICES[this.type].paths;
+if (paths && paths.length > 0) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.scale(1.2, 1.2); // Adjust scale to fit circle
+    ctx.translate(-12, -12); // Center 24x24 icon
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = DEVICES[this.type].color;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    
+    paths.forEach(p => {
+        const path2d = new Path2D(p);
+        ctx.stroke(path2d);
+    });
+    ctx.restore();
+} else {
+    ctx.shadowColor = "transparent";
+    ctx.fillStyle = DEVICES[this.type].color;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 20px Arial";
+    ctx.fillText("?", this.x, this.y+2);
+}
+
+// Draw Wired NIC Indicator (Green)
+if (this.hasNIC && ['pc', 'laptop', 'server'].includes(this.type)) {
+ctx.beginPath();
+ctx.arc(this.x - 20, this.y - 20, 8, 0, Math.PI*2);
+ctx.fillStyle = COLORS.nic;
+ctx.fill();
+ctx.strokeStyle = "white";
+ctx.lineWidth = 1.5;
+ctx.stroke();
+// Tiny icon
+ctx.fillStyle = "white";
+ctx.fillRect(this.x-22, this.y-22, 4, 4);
+}
+
+// Draw Wireless NIC Indicator (Blue)
+if (this.hasWirelessNIC && ['pc', 'laptop'].includes(this.type)) {
+ctx.beginPath();
+ctx.arc(this.x + 20, this.y - 20, 8, 0, Math.PI*2);
+ctx.fillStyle = "#0ea5e9";
+ctx.fill();
+ctx.strokeStyle = "white";
+ctx.lineWidth = 1.5;
+ctx.stroke();
+// Tiny icon (waves)
+ctx.strokeStyle = "white";
+ctx.beginPath();
+ctx.arc(this.x+20, this.y-18, 4, Math.PI, 2*Math.PI); // top half
+ctx.stroke();
+}
+
+ctx.fillStyle = COLORS.text;
+ctx.font = "10px Arial";
+ctx.textAlign = "center";
+ctx.fillText(this.label, this.x, this.y + this.r + 15);
+}
+
+contains(mx, my) {
+const dx = this.x - mx;
+const dy = this.y - my;
+return dx*dx + dy*dy <= this.r * this.r;
+}
+}
+
+class Link {
+constructor(nodeA, nodeB, cableType) {
+this.a = nodeA;
+this.b = nodeB;
+this.cableType = cableType;
+this.status = 'normal';
+}
+draw(ctx) {
+ctx.beginPath();
+ctx.moveTo(this.a.x, this.a.y);
+ctx.lineTo(this.b.x, this.b.y);
+
+if (this.cableType === 'fiber') {
+ctx.lineWidth = 6;
+ctx.strokeStyle = COLORS.linkFiber;
+if(this.status === 'normal') ctx.globalAlpha = 0.6;
+ctx.setLineDash([]);
+} else if (this.cableType === 'wifi') {
+ctx.lineWidth = 3;
+ctx.strokeStyle = COLORS.linkWifi;
+ctx.setLineDash([5, 5]); // Dashed line for WiFi
+ctx.globalAlpha = 0.8;
+} else if (this.cableType === 'radio') {
+ctx.lineWidth = 3;
+ctx.strokeStyle = COLORS.linkRadio;
+ctx.setLineDash([2, 4]); // Dotted/Small dash for Radio
+ctx.globalAlpha = 0.8;
+} else if (this.cableType === 'bluetooth') {
+ctx.lineWidth = 3;
+ctx.strokeStyle = COLORS.linkBluetooth;
+ctx.setLineDash([2, 2]); // Very short dash for Bluetooth
+ctx.globalAlpha = 0.8;
+} else {
+ctx.lineWidth = 4;
+ctx.strokeStyle = COLORS.linkCopper;
+ctx.globalAlpha = 1.0;
+ctx.setLineDash([]);
+}
+
+if (this.status === 'active') {
+ctx.strokeStyle = COLORS.linkActive;
+ctx.lineWidth = 6;
+ctx.globalAlpha = 1.0;
+ctx.setLineDash([]);
+}
+
+ctx.lineCap = "round";
+ctx.stroke();
+ctx.globalAlpha = 1.0;
+ctx.lineWidth = 1;
+ctx.setLineDash([]); // Reset
+}
+
+// New method to check if a point is near the link
+contains(mx, my) {
+    const threshold = 10; // Click tolerance in pixels
+    const A = this.a;
+    const B = this.b;
+    
+    const distSq = (x1, y1, x2, y2) => (x1-x2)**2 + (y1-y2)**2;
+    const l2 = distSq(A.x, A.y, B.x, B.y);
+    
+    if (l2 === 0) return distSq(mx, my, A.x, A.y) < threshold**2;
+    
+    let t = ((mx - A.x) * (B.x - A.x) + (my - A.y) * (B.y - A.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    
+    const projX = A.x + t * (B.x - A.x);
+    const projY = A.y + t * (B.y - A.y);
+    
+    return distSq(mx, my, projX, projY) < threshold**2;
+}
+}
+
+class Packet {
+constructor(link, reverse, color = "#10b981", onComplete) {
+this.link = link;
+this.reverse = reverse;
+this.progress = 0;
+this.speed = 0.04;
+this.done = false;
+this.color = color;
+this.onComplete = onComplete;
+}
+update() {
+this.progress += this.speed;
+if (this.progress >= 1) {
+this.done = true;
+if(this.onComplete) this.onComplete();
+}
+}
+draw(ctx) {
+const start = this.reverse ? this.link.b : this.link.a;
+const end = this.reverse ? this.link.a : this.link.b;
+const x = start.x + (end.x - start.x) * this.progress;
+const y = start.y + (end.y - start.y) * this.progress;
+
+ctx.beginPath();
+ctx.arc(x, y, 6, 0, Math.PI * 2);
+ctx.fillStyle = this.color;
+ctx.fill();
+
+if (this.link.cableType === 'fiber') {
+ctx.shadowColor = this.color;
+ctx.shadowBlur = 10;
+ctx.stroke();
+ctx.shadowColor = "transparent";
+}
+}
+}
+
+// --- Main Functions ---
+
+function activateTool(toolId) {
+if (!LEVELS[state.level].tools.includes(toolId)) return;
+
+document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active-tool'));
+document.getElementById(`tool-${toolId}`).classList.add('active-tool');
+
+const def = DEVICES[toolId];
+
+if (def.type === 'cable') {
+state.activeCableType = toolId;
+setMode('connect');
+showMessage("連接模式", `已選擇: ${def.label}`);
+} else if (def.type === 'tool') {
+if (toolId === 'nic') {
+    setMode('install_nic');
+    showMessage("安裝有線網卡", "請點擊設備以安裝有線網卡 (NIC)");
+} else if (toolId === 'wnic') {
+    setMode('install_wnic');
+    showMessage("安裝無線網卡", "請點擊設備以安裝無線網卡");
+}
+} else {
+addNode(toolId);
+setTimeout(() => {
+if(state.mode === 'move')
+document.getElementById(`tool-${toolId}`).classList.remove('active-tool');
+}, 200);
+}
+}
+
+function addNode(type) {
+const x = state.width / 2 + (Math.random() - 0.5) * 100;
+const y = state.height / 2 + (Math.random() - 0.5) * 100;
+state.nodes.push(new Node(type, x, y));
+setMode('move');
+updateMissionProgress();
+}
+
+function setMode(newMode) {
+state.mode = newMode;
+state.selectedNode = null;
+
+const moveBtn = document.getElementById('btn-mode-move');
+const delBtn = document.getElementById('btn-mode-delete');
+const connBtn = document.getElementById('btn-mode-connect');
+
+[moveBtn, delBtn, connBtn].forEach(btn => {
+if(btn) {
+btn.classList.remove('border-blue-500', 'text-blue-600');
+btn.classList.add('border-transparent', 'text-gray-600');
+}
+});
+
+let activeBtn;
+if(newMode === 'move') activeBtn = moveBtn;
+if(newMode === 'delete') activeBtn = delBtn;
+if(newMode === 'connect') activeBtn = connBtn;
+
+if(activeBtn) {
+activeBtn.classList.add('border-blue-500', 'text-blue-600');
+activeBtn.classList.remove('border-transparent', 'text-gray-600');
+}
+
+const labels = {
+'move': '移動', 
+'connect': `連線 (${state.activeCableType === 'copper' ? '雙扭線' : (state.activeCableType === 'fiber' ? '光纖' : (state.activeCableType === 'radio' ? '無線電波' : (state.activeCableType === 'bluetooth' ? '藍芽' : 'WiFi')))})`,
+'delete': '刪除', 'install_nic': '安裝有線網卡', 'install_wnic': '安裝無線網卡'
+};
+const ind = document.getElementById('mode-indicator');
+if(ind) ind.innerText = "模式: " + labels[newMode];
+
+// Deselect cables if not connect mode
+if (newMode !== 'connect') {
+document.getElementById('tool-copper').classList.remove('active-tool');
+document.getElementById('tool-fiber').classList.remove('active-tool');
+document.getElementById('tool-wifi').classList.remove('active-tool');
+document.getElementById('tool-radio').classList.remove('active-tool');
+document.getElementById('tool-bluetooth').classList.remove('active-tool');
+}
+}
+
+function setupLevel(lvl) {
+state.level = lvl;
+state.nodes = [];
+state.links = [];
+state.packets = [];
+state.levelCompleted = false;
+
+const config = LEVELS[lvl];
+
+document.getElementById('level-title').innerText = config.name;
+
+// Update level select dropdown value
+const levelSelect = document.getElementById('level-select');
+if (levelSelect) levelSelect.value = lvl;
+
+// Update mission overlay style
+const overlay = document.getElementById('mission-overlay');
+overlay.className = `absolute top-4 left-4 z-20 bg-white/95 backdrop-blur shadow-lg rounded-lg border-l-4 border-${config.color}-500 p-4 max-w-sm hidden md:block transition-colors`;
+
+const list = document.getElementById('mission-list');
+list.innerHTML = config.goals.map(g => `<li id="${g.id}" class="text-gray-400">${g.text}</li>`).join('');
+document.getElementById('mission-title').innerText = `第 ${lvl} 關目標`;
+
+updateToolsState(config.tools);
+
+const successModal = document.getElementById('success-modal');
+successModal.classList.add('hidden', 'opacity-0', 'translate-y-20');
+successModal.classList.remove('flex');
+
+showMissionModal(config);
+updateMissionProgress();
+}
+
+function jumpToLevel(lvl) {
+setupLevel(parseInt(lvl));
+}
+
+// --- Animation Logic ---
+function animatePath(pathNodes, color, onFinish) {
+    if (pathNodes.length < 2) return;
+    let sequence = [];
+    for(let i=0; i<pathNodes.length-1; i++) {
+        let n1 = pathNodes[i];
+        let n2 = pathNodes[i+1];
+        let link = state.links.find(l => (l.a === n1 && l.b === n2) || (l.a === n2 && l.b === n1));
+        if (link) {
+            let reverse = (link.a === n1) ? false : true;
+            sequence.push({link, reverse});
+        }
+    }
+
+    function trigger(idx) {
+        if (idx >= sequence.length) {
+            if (onFinish) onFinish();
+            return;
+        }
+        let step = sequence[idx];
+        step.link.status = 'active';
+        state.packets.push(new Packet(step.link, step.reverse, color, () => {
+            step.link.status = 'normal';
+            trigger(idx + 1);
+        }));
+    }
+    trigger(0);
+}
+
+function testConnection() {
+    state.packets = [];
+    state.links.forEach(l => l.status = 'normal');
+
+    const config = LEVELS[state.level];
+    const result = config.validate(state.nodes, state.links);
+
+    if (!result.success) {
+        showMessage("測試失敗", result.msg, true);
+        return;
+    }
+
+    showMessage("配置正確！", "數據傳輸模擬中...", false);
+
+    // Level 15 (IoT) Logic
+    if (state.level === 15) {
+        const phone = state.nodes.find(n => n.type === 'smartphone');
+        const curtain = state.nodes.find(n => n.type === 'curtain');
+        const server = state.nodes.find(n => n.type === 'server');
+        
+        if (!phone || !curtain || !server) return;
+
+        // Sequence: Phone -> Curtain -> Server -> Phone
+        // 1. Phone -> Curtain (Control)
+        const path1 = findPath(phone, curtain);
+        if (path1) {
+            animatePath(path1, '#3b82f6', () => { // Blue (Control)
+                // 2. Curtain -> Server (Status Update)
+                const path2 = findPath(curtain, server);
+                if (path2) {
+                    animatePath(path2, '#f59e0b', () => { // Amber (Data)
+                        // 3. Server -> Phone (Notification)
+                        const path3 = findPath(server, phone);
+                        if (path3) {
+                            animatePath(path3, '#10b981', () => { // Green (Ack)
+                                finishLevel(result.msg);
+                            });
+                        }
+                    });
+                }
+            });
+        }
+        return;
+    }
+
+    // Standard Logic for other levels...
+    let startNode = null;
+    let targets = [];
+
+    if (state.level === 13) {
+        const phones = state.nodes.filter(n => n.type === 'smartphone');
+        if (phones.length >= 2) {
+            startNode = phones[0];
+            targets = phones.slice(1);
+        }
+    } else if (state.level === 14) {
+        const phones = state.nodes.filter(n => n.type === 'smartphone');
+        if (phones.length >= 2) {
+            startNode = phones[0];
+            targets = [phones[1]]; 
+        }
+    } else {
+        const pc = state.nodes.find(n => n.type === 'pc');
+        startNode = pc;
+        if (!startNode) startNode = state.nodes.find(n => n.type === 'smartphone') || state.nodes.find(n => n.type === 'router') || state.nodes.find(n => n.type === 'switch');
+
+        if (state.level === 3) targets = state.nodes.filter(n => n.type === 'printer');
+        else if ([8, 9, 10, 12].includes(state.level)) targets = state.nodes.filter(n => n.type === 'internet');
+        else if (state.level === 7) targets = [...state.nodes.filter(n => n.type === 'server'), ...state.nodes.filter(n => n.type === 'printer')];
+        else if (state.level === 11) targets = [...state.nodes.filter(n => n.type === 'printer'), ...state.nodes.filter(n => n.type === 'tablet')];
+        else {
+            targets = state.nodes.filter(n => n.type === 'pc' && n !== startNode);
+            if (targets.length === 0) targets = state.nodes.filter(n => n.type === 'switch' && n !== startNode);
+        }
+    }
+
+    if (!startNode || targets.length === 0) return;
+
+    let completedAnimations = 0;
+
+    targets.forEach((target, i) => {
+        setTimeout(() => {
+            const path = findPath(startNode, target);
+            if (path) {
+                animatePath(path, '#3b82f6', () => {
+                    setTimeout(() => {
+                        animatePath(path.slice().reverse(), '#10b981', () => {
+                            completedAnimations++;
+                            if (completedAnimations >= targets.length) finishLevel(result.msg);
+                        });
+                    }, 500);
+                });
+            } else {
+                 finishLevel(result.msg); 
+            }
+        }, i * 1200);
+    });
+}
+
+function findPath(start, end) {
+    let queue = [[start]];
+    let visited = new Set([start]);
+    while (queue.length > 0) {
+        let path = queue.shift();
+        let last = path[path.length - 1];
+        if (last === end) return path;
+        state.links.forEach(l => {
+            let neighbor = (l.a === last) ? l.b : (l.b === last ? l.a : null);
+            if (neighbor && !visited.has(neighbor)) {
+                visited.add(neighbor);
+                queue.push([...path, neighbor]);
+            }
+        });
+    }
+    return null;
+}
+
+
+// --- UI Helpers ---
+function finishLevel(msg) {
+state.levelCompleted = true;
+updateMissionProgress();
+const modal = document.getElementById('success-modal');
+document.getElementById('success-msg').innerText = msg;
+const btnText = document.getElementById('btn-next-level');
+btnText.innerHTML = state.level < 15 ? `進入第 ${state.level + 1} 關 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>` : "完成所有課程！";
+modal.classList.remove('hidden', 'translate-y-20', 'opacity-0');
+modal.classList.add('flex');
+}
+
+function updateToolsState(allowed) {
+['switch', 'router', 'modem', 'internet', 'printer', 'server', 'fiber', 'ont', 'pc', 'nic', 'wnic', 'copper', 'ap', 'tablet', 'wifi', 'firewall', 'smartphone', '5g_tower', 'radio', 'bluetooth', 'curtain'].forEach(t => {
+const btn = document.getElementById(`tool-${t}`);
+if(!btn) return;
+if(allowed.includes(t)) {
+btn.classList.remove('tool-locked');
+btn.disabled = false;
+if(btn.querySelector('.lock-icon')) btn.querySelector('.lock-icon').style.display = 'none';
+} else {
+btn.classList.add('tool-locked');
+btn.disabled = true;
+if(btn.querySelector('.lock-icon')) btn.querySelector('.lock-icon').style.display = 'flex';
+}
+});
+}
+
+function updateMissionProgress() {
+const config = LEVELS[state.level];
+// If level completed, mark all green
+if(state.levelCompleted) {
+config.goals.forEach(g => {
+const el = document.getElementById(g.id);
+if(el) el.className = "text-green-600 font-bold line-through transition-all";
+});
+return;
+}
+
+// Real-time check
+config.goals.forEach(g => {
+const el = document.getElementById(g.id);
+if(!el) return;
+
+let isDone = false;
+if(g.check) {
+isDone = g.check(state.nodes, state.links);
+}
+
+if(isDone) {
+el.className = "text-green-600 font-bold line-through transition-all";
+} else {
+el.className = "text-gray-400";
+}
+});
+}
+
+function showMessage(title, body, isError = false) {
+const box = document.getElementById('message-box');
+document.getElementById('msg-title').innerText = title;
+document.getElementById('msg-body').innerText = body;
+box.className = `absolute top-4 left-4 right-4 md:left-auto md:right-4 md:w-80 bg-white/95 backdrop-blur p-4 rounded-lg shadow-xl border-l-4 transition-all duration-300 pointer-events-none transform ${isError ? 'border-red-500' : 'border-blue-500'}`;
+box.classList.remove('opacity-0', '-translate-y-4');
+clearTimeout(window.msgTimeout);
+window.msgTimeout = setTimeout(() => { box.classList.add('opacity-0', '-translate-y-4'); }, 3000);
+}
+
+function showMissionModal(config) {
+const modal = document.getElementById('mission-modal');
+document.getElementById('modal-title').innerText = config.name;
+document.getElementById('modal-desc').innerHTML = config.desc;
+const iconContainer = document.getElementById('modal-icon-container');
+iconContainer.className = `w-16 h-16 bg-${config.color}-100 text-${config.color}-600 rounded-full flex items-center justify-center mx-auto mb-4`;
+iconContainer.innerHTML = `<span class="text-3xl font-bold">${state.level}</span>`;
+document.getElementById('modal-goals').innerHTML = config.goals.map(g => `<li id="${g.id}">${g.text}</li>`).join('');
+modal.classList.remove('hidden');
+}
+
+function showMission() {
+    if (LEVELS[state.level]) {
+        showMissionModal(LEVELS[state.level]);
+    }
+}
+
+function closeMission() { document.getElementById('mission-modal').classList.add('hidden'); }
+
+function resetLevel() { 
+    setupLevel(state.level); 
+    showMessage("已重置", "畫布上的所有設備已清除。");
+}
+
+function nextLevel() {
+if(state.level < 15) setupLevel(state.level + 1);
+else alert("恭喜你完成所有網絡架構課程！");
+}
+
+function getPos(e) {
+const rect = state.canvas.getBoundingClientRect();
+let cx = e.clientX, cy = e.clientY;
+if (e.changedTouches && e.changedTouches.length > 0) {
+cx = e.changedTouches[0].clientX; cy = e.changedTouches[0].clientY;
+}
+return { x: cx - rect.left, y: cy - rect.top };
+}
+
+function handleStart(e) {
+e.preventDefault();
+const pos = getPos(e);
+const node = state.nodes.slice().reverse().find(n => n.contains(pos.x, pos.y));
+
+if (state.mode === 'move') {
+if (node) { state.dragNode = node; state.dragOffset = { x: node.x - pos.x, y: node.y - pos.y }; }
+} else if (state.mode === 'install_nic') {
+if (node && ['pc', 'laptop', 'server'].includes(node.type)) {
+    if (!node.hasNIC) { 
+        node.hasNIC = true; 
+        showMessage("安裝成功", "已安裝有線網絡卡 (NIC)。"); 
+    } else {
+        showMessage("提示", "已安裝過有線網卡。");
+    }
+    updateMissionProgress();
+}
+} else if (state.mode === 'install_wnic') {
+    if (node && ['pc', 'laptop'].includes(node.type)) {
+        if (!node.hasWirelessNIC) { 
+            node.hasWirelessNIC = true; 
+            showMessage("安裝成功", "已安裝無線網絡卡 (WNIC)。"); 
+        } else {
+            showMessage("提示", "已安裝過無線網卡。");
+        }
+        updateMissionProgress();
+    }
+} else if (state.mode === 'connect') {
+if (node) {
+// Validate NIC requirements
+if (state.activeCableType === 'copper') {
+    if (['pc', 'laptop', 'server'].includes(node.type) && !node.hasNIC) {
+        showMessage("無法連接", "請先安裝有線網絡卡 (NIC)！", true);
+        return;
+    }
+}
+// Validate WNIC requirements for PC/Laptop on Wireless
+if (['wifi', 'radio', 'bluetooth'].includes(state.activeCableType)) {
+    if (['pc', 'laptop'].includes(node.type) && !node.hasWirelessNIC) {
+        showMessage("無法連接", "請先安裝無線網絡卡 (WNIC)！", true);
+        return;
+    }
+}
+
+
+if (!state.selectedNode) {
+state.selectedNode = node;
+} else if (state.selectedNode !== node) {
+    const n1 = state.selectedNode;
+    const n2 = node;
+    const type = state.activeCableType;
+
+    // 1. Mobile devices cannot use Copper
+    if (type === 'copper') {
+        if (['smartphone', 'tablet'].includes(n1.type) || ['smartphone', 'tablet'].includes(n2.type)) {
+            showMessage("連接錯誤", "流動裝置無法連接雙扭線 (Copper)。請使用無線連接。", true);
+            state.selectedNode = null;
+            return;
+        }
+    }
+
+    // 2. Fiber restrictions
+    if (type === 'fiber') {
+        const allowedFiber = ['ont', '5g_tower', 'internet'];
+        if (!allowedFiber.includes(n1.type) || !allowedFiber.includes(n2.type)) {
+             showMessage("連接錯誤", "光纖只能連接光纖數據機、5G發射站或互聯網。", true);
+             state.selectedNode = null;
+             return;
+        }
+    }
+    
+    // 3. WiFi Strict Restrictions
+    if (type === 'wifi') {
+        const allowedWifi = ['ap', 'smartphone', 'tablet', 'pc', 'laptop', 'curtain'];
+        
+        // Check if device types are capable of WiFi at all
+        if (!allowedWifi.includes(n1.type)) {
+            showMessage("連接錯誤", `${n1.label} 不支援 Wi-Fi 連接。`, true);
+            state.selectedNode = null; return;
+        }
+        if (!allowedWifi.includes(n2.type)) {
+            showMessage("連接錯誤", `${n2.label} 不支援 Wi-Fi 連接。`, true);
+            state.selectedNode = null; return;
+        }
+
+        // Check if PCs have Wireless NIC
+        if (['pc', 'laptop'].includes(n1.type) && !n1.hasWirelessNIC) {
+            showMessage("無法連接", "來源電腦未安裝無線網絡卡！", true);
+            state.selectedNode = null; return;
+        }
+        if (['pc', 'laptop'].includes(n2.type) && !n2.hasWirelessNIC) {
+            showMessage("無法連接", "目標電腦未安裝無線網絡卡！", true);
+            state.selectedNode = null; return;
+        }
+    }
+
+    // 4. Radio Wave Strict Restrictions (NEW)
+    if (type === 'radio') {
+        const allowedRadio = ['smartphone', 'tablet', '5g_tower'];
+        if (!allowedRadio.includes(n1.type) || !allowedRadio.includes(n2.type)) {
+             showMessage("連接錯誤", "無線電波只適用於智能電話、平板電腦及 5G 發射站。", true);
+             state.selectedNode = null;
+             return;
+        }
+    }
+    
+    // 5. Wired Restriction: PC with Wireless NIC cannot connect to Copper (unless Wired NIC is installed)
+    if (type === 'copper') {
+         if (['pc', 'laptop'].includes(n1.type) && !n1.hasNIC) {
+            showMessage("無法連接", "來源設備缺少有線網絡卡！", true);
+            state.selectedNode = null; return;
+        }
+        if (['pc', 'laptop'].includes(n2.type) && !n2.hasNIC) {
+            showMessage("無法連接", "目標設備缺少有線網絡卡！", true);
+            state.selectedNode = null; return;
+        }
+    }
+
+
+    // --- VALIDATION: Router Logic ---
+    const nodesToCheck = [state.selectedNode, node];
+    let routerCheckPassed = true;
+
+    for (let n of nodesToCheck) {
+        if (n.type === 'router') {
+            // 1. Check prohibited cable types
+            if (['wifi', 'radio', 'bluetooth'].includes(state.activeCableType)) {
+                showMessage("連接錯誤", "路由器不支援無線連接 (WiFi/Radio/Bluetooth)。", true);
+                state.selectedNode = null;
+                routerCheckPassed = false;
+                break;
+            }
+            // 2. Check copper port limit
+            if (state.activeCableType === 'copper') {
+                const copperLinks = state.links.filter(l =>
+                    (l.a === n || l.b === n) && l.cableType === 'copper'
+                ).length;
+                if (copperLinks >= 2) {
+                    showMessage("端口已滿", "路由器最多只能連接 2 條雙扭線。請使用交換器擴充。", true);
+                    state.selectedNode = null;
+                    routerCheckPassed = false;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!routerCheckPassed) return;
+    // ------------------------------------
+
+    // --- NEW VALIDATION: End Device Port Logic (Dual Support for PC) ---
+    
+    const isWiredType = (state.activeCableType === 'copper' || state.activeCableType === 'fiber');
+    const isWirelessType = ['wifi', 'radio', 'bluetooth'].includes(state.activeCableType);
+
+    // Helper to check individual node capacity
+    const checkNodeCapacity = (n) => {
+        // PC & Laptop: Allow 1 Wired AND 1 Wireless simultaneously
+        if (['pc', 'laptop'].includes(n.type)) {
+            const wiredCount = state.links.filter(l => (l.a === n || l.b === n) && (l.cableType === 'copper' || l.cableType === 'fiber')).length;
+            const wirelessCount = state.links.filter(l => (l.a === n || l.b === n) && ['wifi', 'radio', 'bluetooth'].includes(l.cableType)).length;
+            
+            if (isWiredType && wiredCount >= 1) return { ok: false, msg: "有線端口已連接。" };
+            if (isWirelessType && wirelessCount >= 1) return { ok: false, msg: "無線連接已建立。" };
+            return { ok: true };
+        }
+        
+        // Other End Devices (Server, Printer, Tablet, Smartphone): Single connection limit (simplified)
+        if (['server', 'printer', 'tablet', 'smartphone', 'curtain'].includes(n.type)) {
+            if (getLinkCount(n) >= 1) return { ok: false, msg: "設備接口已滿。" };
+        }
+        return { ok: true };
+    };
+
+    // Check Source
+    let check1 = checkNodeCapacity(state.selectedNode);
+    if (!check1.ok) {
+        showMessage("連接失敗", check1.msg, true);
+        state.selectedNode = null;
+        return;
+    }
+
+    // Check Target
+    let check2 = checkNodeCapacity(node);
+    if (!check2.ok) {
+        showMessage("連接失敗", "目標" + check2.msg, true);
+        state.selectedNode = null;
+        return;
+    }
+
+    // Create Link
+    if (!hasLink(state.links, state.selectedNode, node)) {
+        state.links.push(new Link(state.selectedNode, node, state.activeCableType));
+        showMessage("連接成功", `${state.activeCableType === 'fiber' ? '光纖' : (state.activeCableType === 'wifi' ? '無線' : (state.activeCableType === 'radio' ? '無線電波' : (state.activeCableType === 'bluetooth' ? '藍芽' : '線路')))}已連接。`);
+        updateMissionProgress();
+    }
+    state.selectedNode = null;
+}
+} else state.selectedNode = null;
+} else if (state.mode === 'delete') {
+    if (node) {
+        state.nodes = state.nodes.filter(n => n !== node);
+        state.links = state.links.filter(l => l.a !== node && l.b !== node);
+        updateMissionProgress();
+    } else {
+        // Check links
+        const link = state.links.find(l => l.contains(pos.x, pos.y));
+        if (link) {
+            state.links = state.links.filter(l => l !== link);
+            showMessage("已刪除", "連線已移除。");
+            updateMissionProgress();
+        }
+    }
+}
+}
+
+function handleMove(e) {
+e.preventDefault();
+if (state.mode === 'move' && state.dragNode) {
+const pos = getPos(e);
+state.dragNode.x = pos.x + state.dragOffset.x;
+state.dragNode.y = pos.y + state.dragOffset.y;
+}
+}
+
+function handleEnd(e) { state.dragNode = null; }
+
+function gameLoop() {
+const ctx = state.ctx;
+if (!ctx) return;
+ctx.clearRect(0, 0, state.width, state.height);
+state.links.forEach(l => l.draw(ctx));
+state.nodes.forEach(n => n.draw(ctx));
+state.packets = state.packets.filter(p => !p.done);
+state.packets.forEach(p => { p.update(); p.draw(ctx); });
+requestAnimationFrame(gameLoop);
+}
+
+// Explicitly define resizeCanvas in global scope
+function resizeCanvas() {
+const container = document.getElementById('canvas-container');
+if (container) {
+state.width = container.clientWidth;
+state.height = container.clientHeight;
+if (state.canvas) {
+state.canvas.width = state.width;
+state.canvas.height = state.height;
+}
+}
+}
+
+// --- Init ---
+window.onload = function() {
+state.canvas = document.getElementById('gameCanvas');
+if(state.canvas) {
+state.ctx = state.canvas.getContext('2d');
+
+// Populate Level Select
+const select = document.getElementById('level-select');
+if (select) {
+for(let i=1; i<=15; i++) {
+const opt = document.createElement('option');
+opt.value = i;
+opt.innerText = `第 ${i} 關`;
+select.appendChild(opt);
+}
+}
+
+// Initial resize
+resizeCanvas();
+
+// Listeners
+window.addEventListener('resize', resizeCanvas);
+state.canvas.addEventListener('mousedown', handleStart);
+state.canvas.addEventListener('mousemove', handleMove);
+window.addEventListener('mouseup', handleEnd);
+state.canvas.addEventListener('touchstart', handleStart, {passive: false});
+state.canvas.addEventListener('touchmove', handleMove, {passive: false});
+window.addEventListener('touchend', handleEnd);
+
+// Start Game
+setupLevel(1);
+requestAnimationFrame(gameLoop);
+}
+};
+
+</script>
+</body>
+</html>
