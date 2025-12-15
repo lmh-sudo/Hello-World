@@ -486,7 +486,11 @@ canvas: null,
 ctx: null,
 width: 0,
 height: 0,
-levelCompleted: false
+levelCompleted: false,
+placingType: null, // Track device type being placed
+dragStartNode: null, // For drag-to-connect
+isDraggingLink: false,
+currentMousePos: { x: 0, y: 0 }
 };
 
 // --- Helper Functions ---
@@ -1660,19 +1664,15 @@ if (toolId === 'nic') {
     showMessage("安裝無線網卡", "請點擊設備以安裝無線網卡");
 }
 } else {
-addNode(toolId);
-setTimeout(() => {
-if(state.mode === 'move')
-document.getElementById(`tool-${toolId}`).classList.remove('active-tool');
-}, 200);
+    // Device placement mode
+    state.placingType = toolId;
+    setMode('place');
+    showMessage("放置模式", `請在畫布上點擊位置以放置 ${def.label}`);
 }
 }
 
-function addNode(type) {
-const x = state.width / 2 + (Math.random() - 0.5) * 100;
-const y = state.height / 2 + (Math.random() - 0.5) * 100;
+function addNode(type, x, y) {
 state.nodes.push(new Node(type, x, y));
-setMode('move');
 updateMissionProgress();
 }
 
@@ -1695,19 +1695,34 @@ let activeBtn;
 if(newMode === 'move') activeBtn = moveBtn;
 if(newMode === 'delete') activeBtn = delBtn;
 if(newMode === 'connect') activeBtn = connBtn;
+// No active button visual state for 'place' mode on the floating bar, 
+// as the toolbar button is highlighted.
 
 if(activeBtn) {
 activeBtn.classList.add('border-blue-500', 'text-blue-600');
 activeBtn.classList.remove('border-transparent', 'text-gray-600');
 }
 
+// Cursor update based on mode
+const canvas = document.getElementById('gameCanvas');
+if (canvas) {
+    if (newMode === 'place') canvas.style.cursor = 'crosshair';
+    else if (newMode === 'move') canvas.style.cursor = 'move';
+    else if (newMode === 'connect') canvas.style.cursor = 'default'; // Or custom connect cursor
+    else if (newMode === 'delete') canvas.style.cursor = 'not-allowed'; // Or custom delete cursor
+    else canvas.style.cursor = 'default';
+}
+
 const labels = {
 'move': '移動', 
 'connect': `連線 (${state.activeCableType === 'copper' ? '雙扭線' : (state.activeCableType === 'fiber' ? '光纖' : (state.activeCableType === 'radio' ? '無線電波' : (state.activeCableType === 'bluetooth' ? '藍芽' : 'WiFi')))})`,
-'delete': '刪除', 'install_nic': '安裝有線網卡', 'install_wnic': '安裝無線網卡'
+'delete': '刪除', 
+'install_nic': '安裝有線網卡', 
+'install_wnic': '安裝無線網卡',
+'place': '放置設備'
 };
 const ind = document.getElementById('mode-indicator');
-if(ind) ind.innerText = "模式: " + labels[newMode];
+if(ind) ind.innerText = "模式: " + (labels[newMode] || newMode);
 
 // Deselect cables if not connect mode
 if (newMode !== 'connect') {
@@ -1725,6 +1740,7 @@ state.nodes = [];
 state.links = [];
 state.packets = [];
 state.levelCompleted = false;
+state.placingType = null; // Reset placing type
 
 const config = LEVELS[lvl];
 
@@ -1750,6 +1766,7 @@ successModal.classList.remove('flex');
 
 showMissionModal(config);
 updateMissionProgress();
+setMode('move'); // Default mode
 }
 
 function jumpToLevel(lvl) {
@@ -2013,6 +2030,20 @@ e.preventDefault();
 const pos = getPos(e);
 const node = state.nodes.slice().reverse().find(n => n.contains(pos.x, pos.y));
 
+if (state.mode === 'place' && state.placingType) {
+    addNode(state.placingType, pos.x, pos.y);
+    // Optional: sound or visual feedback
+    // Reset to move mode
+    setMode('move');
+    // Remove active class from device button
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+        if(DEVICES[btn.id.replace('tool-', '')]?.type === 'node') {
+            btn.classList.remove('active-tool');
+        }
+    });
+    return;
+}
+
 if (state.mode === 'move') {
 if (node) { state.dragNode = node; state.dragOffset = { x: node.x - pos.x, y: node.y - pos.y }; }
 } else if (state.mode === 'install_nic') {
@@ -2037,176 +2068,11 @@ if (node && ['pc', 'laptop', 'server'].includes(node.type)) {
     }
 } else if (state.mode === 'connect') {
 if (node) {
-// Validate NIC requirements
-if (state.activeCableType === 'copper') {
-    if (['pc', 'laptop', 'server'].includes(node.type) && !node.hasNIC) {
-        showMessage("無法連接", "請先安裝有線網絡卡 (NIC)！", true);
-        return;
-    }
+    state.dragStartNode = node;
+    state.isDraggingLink = true;
+    state.currentMousePos = pos;
+    // We do NOT check validation here. We check it at handleEnd.
 }
-// Validate WNIC requirements for PC/Laptop on Wireless
-if (['wifi', 'radio', 'bluetooth'].includes(state.activeCableType)) {
-    if (['pc', 'laptop'].includes(node.type) && !node.hasWirelessNIC) {
-        showMessage("無法連接", "請先安裝無線網絡卡 (WNIC)！", true);
-        return;
-    }
-}
-
-
-if (!state.selectedNode) {
-state.selectedNode = node;
-} else if (state.selectedNode !== node) {
-    const n1 = state.selectedNode;
-    const n2 = node;
-    const type = state.activeCableType;
-
-    // 1. Mobile devices cannot use Copper
-    if (type === 'copper') {
-        if (['smartphone', 'tablet'].includes(n1.type) || ['smartphone', 'tablet'].includes(n2.type)) {
-            showMessage("連接錯誤", "流動裝置無法連接雙扭線 (Copper)。請使用無線連接。", true);
-            state.selectedNode = null;
-            return;
-        }
-    }
-
-    // 2. Fiber restrictions
-    if (type === 'fiber') {
-        const allowedFiber = ['ont', '5g_tower', 'internet'];
-        if (!allowedFiber.includes(n1.type) || !allowedFiber.includes(n2.type)) {
-             showMessage("連接錯誤", "光纖只能連接光纖數據機、5G發射站或互聯網。", true);
-             state.selectedNode = null;
-             return;
-        }
-    }
-    
-    // 3. WiFi Strict Restrictions
-    if (type === 'wifi') {
-        const allowedWifi = ['ap', 'smartphone', 'tablet', 'pc', 'laptop', 'curtain'];
-        
-        // Check if device types are capable of WiFi at all
-        if (!allowedWifi.includes(n1.type)) {
-            showMessage("連接錯誤", `${n1.label} 不支援 Wi-Fi 連接。`, true);
-            state.selectedNode = null; return;
-        }
-        if (!allowedWifi.includes(n2.type)) {
-            showMessage("連接錯誤", `${n2.label} 不支援 Wi-Fi 連接。`, true);
-            state.selectedNode = null; return;
-        }
-
-        // Check if PCs have Wireless NIC
-        if (['pc', 'laptop'].includes(n1.type) && !n1.hasWirelessNIC) {
-            showMessage("無法連接", "來源電腦未安裝無線網絡卡！", true);
-            state.selectedNode = null; return;
-        }
-        if (['pc', 'laptop'].includes(n2.type) && !n2.hasWirelessNIC) {
-            showMessage("無法連接", "目標電腦未安裝無線網絡卡！", true);
-            state.selectedNode = null; return;
-        }
-    }
-
-    // 4. Radio Wave Strict Restrictions (NEW)
-    if (type === 'radio') {
-        const allowedRadio = ['smartphone', 'tablet', '5g_tower'];
-        if (!allowedRadio.includes(n1.type) || !allowedRadio.includes(n2.type)) {
-             showMessage("連接錯誤", "無線電波只適用於智能電話、平板電腦及 5G 發射站。", true);
-             state.selectedNode = null;
-             return;
-        }
-    }
-    
-    // 5. Wired Restriction: PC with Wireless NIC cannot connect to Copper (unless Wired NIC is installed)
-    if (type === 'copper') {
-         if (['pc', 'laptop'].includes(n1.type) && !n1.hasNIC) {
-            showMessage("無法連接", "來源設備缺少有線網絡卡！", true);
-            state.selectedNode = null; return;
-        }
-        if (['pc', 'laptop'].includes(n2.type) && !n2.hasNIC) {
-            showMessage("無法連接", "目標設備缺少有線網絡卡！", true);
-            state.selectedNode = null; return;
-        }
-    }
-
-
-    // --- VALIDATION: Router Logic ---
-    const nodesToCheck = [state.selectedNode, node];
-    let routerCheckPassed = true;
-
-    for (let n of nodesToCheck) {
-        if (n.type === 'router') {
-            // 1. Check prohibited cable types
-            if (['wifi', 'radio', 'bluetooth'].includes(state.activeCableType)) {
-                showMessage("連接錯誤", "路由器不支援無線連接 (WiFi/Radio/Bluetooth)。", true);
-                state.selectedNode = null;
-                routerCheckPassed = false;
-                break;
-            }
-            // 2. Check copper port limit
-            if (state.activeCableType === 'copper') {
-                const copperLinks = state.links.filter(l =>
-                    (l.a === n || l.b === n) && l.cableType === 'copper'
-                ).length;
-                if (copperLinks >= 2) {
-                    showMessage("端口已滿", "路由器最多只能連接 2 條雙扭線。請使用交換器擴充。", true);
-                    state.selectedNode = null;
-                    routerCheckPassed = false;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (!routerCheckPassed) return;
-    // ------------------------------------
-
-    // --- NEW VALIDATION: End Device Port Logic (Dual Support for PC) ---
-    
-    const isWiredType = (state.activeCableType === 'copper' || state.activeCableType === 'fiber');
-    const isWirelessType = ['wifi', 'radio', 'bluetooth'].includes(state.activeCableType);
-
-    // Helper to check individual node capacity
-    const checkNodeCapacity = (n) => {
-        // PC & Laptop: Allow 1 Wired AND 1 Wireless simultaneously
-        if (['pc', 'laptop'].includes(n.type)) {
-            const wiredCount = state.links.filter(l => (l.a === n || l.b === n) && (l.cableType === 'copper' || l.cableType === 'fiber')).length;
-            const wirelessCount = state.links.filter(l => (l.a === n || l.b === n) && ['wifi', 'radio', 'bluetooth'].includes(l.cableType)).length;
-            
-            if (isWiredType && wiredCount >= 1) return { ok: false, msg: "有線端口已連接。" };
-            if (isWirelessType && wirelessCount >= 1) return { ok: false, msg: "無線連接已建立。" };
-            return { ok: true };
-        }
-        
-        // Other End Devices (Server, Printer, Tablet, Smartphone): Single connection limit (simplified)
-        if (['server', 'printer', 'tablet', 'smartphone', 'curtain'].includes(n.type)) {
-            if (getLinkCount(n) >= 1) return { ok: false, msg: "設備接口已滿。" };
-        }
-        return { ok: true };
-    };
-
-    // Check Source
-    let check1 = checkNodeCapacity(state.selectedNode);
-    if (!check1.ok) {
-        showMessage("連接失敗", check1.msg, true);
-        state.selectedNode = null;
-        return;
-    }
-
-    // Check Target
-    let check2 = checkNodeCapacity(node);
-    if (!check2.ok) {
-        showMessage("連接失敗", "目標" + check2.msg, true);
-        state.selectedNode = null;
-        return;
-    }
-
-    // Create Link
-    if (!hasLink(state.links, state.selectedNode, node)) {
-        state.links.push(new Link(state.selectedNode, node, state.activeCableType));
-        showMessage("連接成功", `${state.activeCableType === 'fiber' ? '光纖' : (state.activeCableType === 'wifi' ? '無線' : (state.activeCableType === 'radio' ? '無線電波' : (state.activeCableType === 'bluetooth' ? '藍芽' : '線路')))}已連接。`);
-        updateMissionProgress();
-    }
-    state.selectedNode = null;
-}
-} else state.selectedNode = null;
 } else if (state.mode === 'delete') {
     if (node) {
         state.nodes = state.nodes.filter(n => n !== node);
@@ -2226,20 +2092,181 @@ state.selectedNode = node;
 
 function handleMove(e) {
 e.preventDefault();
-if (state.mode === 'move' && state.dragNode) {
 const pos = getPos(e);
-state.dragNode.x = pos.x + state.dragOffset.x;
-state.dragNode.y = pos.y + state.dragOffset.y;
+state.currentMousePos = pos;
+
+if (state.mode === 'move' && state.dragNode) {
+    state.dragNode.x = pos.x + state.dragOffset.x;
+    state.dragNode.y = pos.y + state.dragOffset.y;
 }
 }
 
-function handleEnd(e) { state.dragNode = null; }
+function handleEnd(e) { 
+    if (state.mode === 'connect' && state.isDraggingLink && state.dragStartNode) {
+        const pos = getPos(e);
+        const node = state.nodes.slice().reverse().find(n => n.contains(pos.x, pos.y));
+        
+        if (node && node !== state.dragStartNode) {
+             // Perform connection logic here (originally in handleStart)
+             const n1 = state.dragStartNode;
+             const n2 = node;
+             const type = state.activeCableType;
+
+            // 1. Mobile devices cannot use Copper
+            if (type === 'copper') {
+                if (['smartphone', 'tablet'].includes(n1.type) || ['smartphone', 'tablet'].includes(n2.type)) {
+                    showMessage("連接錯誤", "流動裝置無法連接雙扭線 (Copper)。請使用無線連接。", true);
+                    resetDrag(); return;
+                }
+            }
+
+            // 2. Fiber restrictions
+            if (type === 'fiber') {
+                const allowedFiber = ['ont', '5g_tower', 'internet'];
+                if (!allowedFiber.includes(n1.type) || !allowedFiber.includes(n2.type)) {
+                     showMessage("連接錯誤", "光纖只能連接光纖數據機、5G發射站或互聯網。", true);
+                     resetDrag(); return;
+                }
+            }
+            
+            // 3. WiFi Strict Restrictions
+            if (type === 'wifi') {
+                const allowedWifi = ['ap', 'smartphone', 'tablet', 'pc', 'laptop', 'curtain'];
+                
+                if (!allowedWifi.includes(n1.type)) {
+                    showMessage("連接錯誤", `${n1.label} 不支援 Wi-Fi 連接。`, true);
+                    resetDrag(); return;
+                }
+                if (!allowedWifi.includes(n2.type)) {
+                    showMessage("連接錯誤", `${n2.label} 不支援 Wi-Fi 連接。`, true);
+                    resetDrag(); return;
+                }
+
+                if (['pc', 'laptop'].includes(n1.type) && !n1.hasWirelessNIC) {
+                    showMessage("無法連接", "來源電腦未安裝無線網絡卡！", true);
+                    resetDrag(); return;
+                }
+                if (['pc', 'laptop'].includes(n2.type) && !n2.hasWirelessNIC) {
+                    showMessage("無法連接", "目標電腦未安裝無線網絡卡！", true);
+                    resetDrag(); return;
+                }
+            }
+
+            // 4. Radio Wave Strict Restrictions
+            if (type === 'radio') {
+                const allowedRadio = ['smartphone', 'tablet', '5g_tower'];
+                if (!allowedRadio.includes(n1.type) || !allowedRadio.includes(n2.type)) {
+                     showMessage("連接錯誤", "無線電波只適用於智能電話、平板電腦及 5G 發射站。", true);
+                     resetDrag(); return;
+                }
+            }
+            
+            // 5. Wired Restriction: PC with Wireless NIC cannot connect to Copper (unless Wired NIC is installed)
+            if (type === 'copper') {
+                 if (['pc', 'laptop'].includes(n1.type) && !n1.hasNIC) {
+                    showMessage("無法連接", "來源設備缺少有線網絡卡！", true);
+                    resetDrag(); return;
+                }
+                if (['pc', 'laptop'].includes(n2.type) && !n2.hasNIC) {
+                    showMessage("無法連接", "目標設備缺少有線網絡卡！", true);
+                    resetDrag(); return;
+                }
+            }
+
+            // --- VALIDATION: Router Logic ---
+            const nodesToCheck = [n1, n2];
+            let routerCheckPassed = true;
+
+            for (let n of nodesToCheck) {
+                if (n.type === 'router') {
+                    if (['wifi', 'radio', 'bluetooth'].includes(state.activeCableType)) {
+                        showMessage("連接錯誤", "路由器不支援無線連接 (WiFi/Radio/Bluetooth)。", true);
+                        routerCheckPassed = false; break;
+                    }
+                    if (state.activeCableType === 'copper') {
+                        const copperLinks = state.links.filter(l =>
+                            (l.a === n || l.b === n) && l.cableType === 'copper'
+                        ).length;
+                        if (copperLinks >= 2) {
+                            showMessage("端口已滿", "路由器最多只能連接 2 條雙扭線。請使用交換器擴充。", true);
+                            routerCheckPassed = false; break;
+                        }
+                    }
+                }
+            }
+
+            if (!routerCheckPassed) { resetDrag(); return; }
+
+            // --- NEW VALIDATION: End Device Port Logic ---
+            const isWiredType = (state.activeCableType === 'copper' || state.activeCableType === 'fiber');
+            const isWirelessType = ['wifi', 'radio', 'bluetooth'].includes(state.activeCableType);
+
+            const checkNodeCapacity = (n) => {
+                if (['pc', 'laptop'].includes(n.type)) {
+                    const wiredCount = state.links.filter(l => (l.a === n || l.b === n) && (l.cableType === 'copper' || l.cableType === 'fiber')).length;
+                    const wirelessCount = state.links.filter(l => (l.a === n || l.b === n) && ['wifi', 'radio', 'bluetooth'].includes(l.cableType)).length;
+                    
+                    if (isWiredType && wiredCount >= 1) return { ok: false, msg: "有線端口已連接。" };
+                    if (isWirelessType && wirelessCount >= 1) return { ok: false, msg: "無線連接已建立。" };
+                    return { ok: true };
+                }
+                if (['server', 'printer', 'tablet', 'smartphone', 'curtain'].includes(n.type)) {
+                    if (getLinkCount(n) >= 1) return { ok: false, msg: "設備接口已滿。" };
+                }
+                return { ok: true };
+            };
+
+            let check1 = checkNodeCapacity(n1);
+            if (!check1.ok) { showMessage("連接失敗", check1.msg, true); resetDrag(); return; }
+
+            let check2 = checkNodeCapacity(n2);
+            if (!check2.ok) { showMessage("連接失敗", "目標" + check2.msg, true); resetDrag(); return; }
+
+            if (!hasLink(state.links, n1, n2)) {
+                state.links.push(new Link(n1, n2, state.activeCableType));
+                showMessage("連接成功", `${state.activeCableType === 'fiber' ? '光纖' : (state.activeCableType === 'wifi' ? '無線' : (state.activeCableType === 'radio' ? '無線電波' : (state.activeCableType === 'bluetooth' ? '藍芽' : '線路')))}已連接。`);
+                updateMissionProgress();
+            }
+        }
+    }
+    
+    resetDrag();
+    state.dragNode = null; 
+}
+
+function resetDrag() {
+    state.isDraggingLink = false;
+    state.dragStartNode = null;
+}
 
 function gameLoop() {
 const ctx = state.ctx;
 if (!ctx) return;
 ctx.clearRect(0, 0, state.width, state.height);
 state.links.forEach(l => l.draw(ctx));
+
+// Draw temp link if dragging
+if (state.isDraggingLink && state.dragStartNode) {
+    ctx.beginPath();
+    ctx.moveTo(state.dragStartNode.x, state.dragStartNode.y);
+    ctx.lineTo(state.currentMousePos.x, state.currentMousePos.y);
+    
+    // Style matches active cable
+    if (state.activeCableType === 'fiber') {
+        ctx.lineWidth = 6; ctx.strokeStyle = COLORS.linkFiber; ctx.globalAlpha = 0.6; ctx.setLineDash([]);
+    } else if (state.activeCableType === 'wifi') {
+        ctx.lineWidth = 3; ctx.strokeStyle = COLORS.linkWifi; ctx.setLineDash([5, 5]); ctx.globalAlpha = 0.8;
+    } else if (state.activeCableType === 'radio') {
+        ctx.lineWidth = 3; ctx.strokeStyle = COLORS.linkRadio; ctx.setLineDash([2, 4]); ctx.globalAlpha = 0.8;
+    } else if (state.activeCableType === 'bluetooth') {
+        ctx.lineWidth = 3; ctx.strokeStyle = COLORS.linkBluetooth; ctx.setLineDash([2, 2]); ctx.globalAlpha = 0.8;
+    } else {
+        ctx.lineWidth = 4; ctx.strokeStyle = COLORS.linkCopper; ctx.globalAlpha = 1.0; ctx.setLineDash([]);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1.0; ctx.lineWidth = 1;
+}
+
 state.nodes.forEach(n => n.draw(ctx));
 state.packets = state.packets.filter(p => !p.done);
 state.packets.forEach(p => { p.update(); p.draw(ctx); });
