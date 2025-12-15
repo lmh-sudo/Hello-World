@@ -13,7 +13,6 @@
         /* 頁面主容器滿屏高度 */
         #app {
             height: calc(var(--vh) * 100);  /* 使用動態 --vh 計算滿屏 */
-            background-color: lightblue;    /* 僅示範顏色 */
             display: flex;
             flex-direction: column;
             justify-content: space-between; /* 讓內容分散，底部可見 */
@@ -21,10 +20,15 @@
 
         /* 底部內容範例 */
         .bottom-content {
-            background-color: yellow;
-            padding: 20px;
+            //background-color: white;
+            padding: 10px;
             text-align: center;
         }
+		@media screen and (min-width: 1024px) {  /* 調整 min-width 為您的桌面斷點，例如 768px 或 1200px */
+			.bottom-content {
+				display: none;  /* 隱藏 footer */
+			}
+		}
 		
 body {
 overscroll-behavior: none;
@@ -2400,7 +2404,7 @@ requestAnimationFrame(gameLoop);
 };
 
 </script>
-<footer class="bottom-content">這是底部內容，應該總是可見</footer>
+<footer class="bottom-content"></footer>
 </div>
 <script>
         // 函式：計算並設置 --vh 變數
