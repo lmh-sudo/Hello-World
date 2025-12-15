@@ -6,6 +6,26 @@
 <title>網絡架構師 - 進階網絡課程 (15關)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
+:root {
+            --vh: 1vh;
+        }
+
+        /* 頁面主容器滿屏高度 */
+        #app {
+            height: calc(var(--vh) * 100);  /* 使用動態 --vh 計算滿屏 */
+            background-color: lightblue;    /* 僅示範顏色 */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* 讓內容分散，底部可見 */
+        }
+
+        /* 底部內容範例 */
+        .bottom-content {
+            background-color: yellow;
+            padding: 20px;
+            text-align: center;
+        }
+		
 body {
 overscroll-behavior: none;
 touch-action: none;
@@ -56,7 +76,7 @@ border-radius: 3px;
 </style>
 </head>
 <body class="h-screen w-screen flex flex-col overflow-hidden bg-gray-50 text-gray-800">
-
+<div id="app">
 <!-- Header -->
 <header class="bg-blue-600 text-white p-3 shadow-md flex justify-between items-center z-10">
 <div class="flex items-center gap-2">
@@ -2380,5 +2400,23 @@ requestAnimationFrame(gameLoop);
 };
 
 </script>
+<footer class="bottom-content">這是底部內容，應該總是可見</footer>
+</div>
+<script>
+        // 函式：計算並設置 --vh 變數
+        function setVH() {
+            let vh = window.innerHeight * 0.01;  // 計算 1% 的實際內部高度
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+
+        // 初始呼叫
+        setVH();
+
+        // 監聽視窗大小變化（行動裝置工具列隱藏/顯示時觸發）
+        window.addEventListener('resize', setVH);
+
+        // 可選：監聽 orientationchange 以處理螢幕旋轉
+        window.addEventListener('orientationchange', setVH);
+    </script>
 </body>
 </html>
