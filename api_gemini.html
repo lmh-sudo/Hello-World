@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI English Self-Intro (Test Version)</title>
+    <title>AI English Self-Intro Helper (Gemini Pro)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
@@ -11,15 +11,28 @@
         body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .container { max-width: 800px; margin-top: 30px; margin-bottom: 50px; }
         .card { border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: none; }
+        
+        /* 步驟切換動畫 */
         .step-section { display: none; animation: fadeIn 0.5s; }
         .step-section.active { display: block; }
         
         /* 聊天室樣式 */
-        .chat-container { height: 400px; overflow-y: auto; background: #f9f9f9; padding: 20px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 15px; }
-        .message { margin-bottom: 15px; padding: 10px 15px; border-radius: 15px; max-width: 85%; word-wrap: break-word; }
-        .message.user { background-color: #007bff; color: white; margin-left: auto; border-bottom-right-radius: 2px; }
+        .chat-container { 
+            height: 400px; 
+            overflow-y: auto; 
+            background: #f8f9fa; 
+            padding: 20px; 
+            border-radius: 10px; 
+            border: 1px solid #dee2e6; 
+            margin-bottom: 15px; 
+        }
+        .message { margin-bottom: 15px; padding: 12px 16px; border-radius: 15px; max-width: 85%; word-wrap: break-word; line-height: 1.5; }
+        .message.user { background-color: #0d6efd; color: white; margin-left: auto; border-bottom-right-radius: 2px; }
         .message.model { background-color: #e9ecef; color: #333; margin-right: auto; border-bottom-left-radius: 2px; }
-        .message p { margin-bottom: 0; } /* 修正 Markdown 的段落間距 */
+        
+        /* 修正 Markdown 的段落間距 */
+        .message p { margin-bottom: 0.5rem; } 
+        .message p:last-child { margin-bottom: 0; }
         
         .loading { display: none; text-align: center; color: #666; font-style: italic; margin-top: 10px; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -29,60 +42,69 @@
 
 <div class="container">
     <div class="card p-4">
-        <h2 class="text-center text-primary mb-4">🤖 AI Self-Introduction Helper</h2>
+        <div class="text-center mb-4">
+            <h2 class="text-primary fw-bold">🤖 AI Self-Introduction Helper</h2>
+            <p class="text-muted">Generate and refine your English self-introduction.</p>
+        </div>
 
         <div id="step1" class="step-section active">
-            <h4 class="mb-3 border-bottom pb-2">Step 1: Who are you?</h4>
+            <h4 class="mb-3 border-bottom pb-2 text-primary">Step 1: Who are you?</h4>
             <div class="mb-3">
-                <label>Name:</label>
-                <input type="text" id="inputName" class="form-control" placeholder="e.g. Chris Wong">
+                <label class="form-label">Name (名字):</label>
+                <input type="text" id="inputName" class="form-control form-control-lg" placeholder="e.g. Chris Wong">
             </div>
             <div class="mb-3">
-                <label>Grade:</label>
-                <select id="inputGrade" class="form-select">
+                <label class="form-label">Grade (年級):</label>
+                <select id="inputGrade" class="form-select form-select-lg">
                     <option value="Form 1">Secondary 1 (Junior)</option>
                     <option value="Form 2">Secondary 2 (Junior)</option>
                     <option value="Form 3">Secondary 3 (Junior)</option>
                     <option value="Senior Form">Secondary 4-6 (Senior/DSE)</option>
                 </select>
             </div>
-            <button onclick="nextStep(2)" class="btn btn-primary w-100">Next ➡</button>
+            <button onclick="nextStep(2)" class="btn btn-primary w-100 btn-lg mt-2">Next Step ➡</button>
         </div>
 
         <div id="step2" class="step-section">
-            <h4 class="mb-3 border-bottom pb-2">Step 2: Details</h4>
+            <h4 class="mb-3 border-bottom pb-2 text-primary">Step 2: Details</h4>
             <div class="mb-3">
-                <label>Hobbies:</label>
+                <label class="form-label">Hobbies (興趣):</label>
                 <input type="text" id="inputHobbies" class="form-control" placeholder="e.g. playing online games, swimming">
             </div>
             <div class="mb-3">
-                <label>Personality / Strengths:</label>
+                <label class="form-label">Personality / Strengths (性格/優點):</label>
                 <input type="text" id="inputPersonality" class="form-control" placeholder="e.g. friendly, active, helpful">
             </div>
             <div class="mb-3">
-                <label>Dream / Future Goal:</label>
+                <label class="form-label">Dream / Future Goal (夢想):</label>
                 <input type="text" id="inputDream" class="form-control" placeholder="e.g. want to be a YouTuber">
             </div>
-            <div class="d-flex justify-content-between">
+            <div class="d-flex justify-content-between mt-4">
                 <button onclick="nextStep(1)" class="btn btn-secondary">⬅ Back</button>
-                <button onclick="generateDraft()" class="btn btn-success">Generate AI Draft ✨</button>
+                <button onclick="generateDraft()" class="btn btn-success btn-lg">Generate AI Draft ✨</button>
             </div>
         </div>
 
         <div id="step3" class="step-section">
-            <h4 class="mb-3 border-bottom pb-2">Step 3: Refine with AI</h4>
+            <h4 class="mb-3 border-bottom pb-2 text-primary">Step 3: Refine with AI</h4>
+            <div class="alert alert-info py-2 small">
+                <i class="bi bi-info-circle"></i> 不滿意？在下方輸入指令讓 AI 修改 (例如: "Make it longer")。
+            </div>
+
             <div id="chatBox" class="chat-container"></div>
             
             <div id="loadingMsg" class="loading">
                 <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                AI is thinking...
+                AI is writing...
             </div>
 
             <div class="input-group mt-3">
-                <input type="text" id="userMessage" class="form-control" placeholder="e.g. Make it simpler / Add that I have a cat">
-                <button onclick="sendUserMessage()" class="btn btn-primary" id="sendBtn">Send</button>
+                <input type="text" id="userMessage" class="form-control" placeholder="Type instructions here... (e.g. make it funnier)">
+                <button onclick="sendUserMessage()" class="btn btn-primary" id="sendBtn">Send 🚀</button>
             </div>
-            <button onclick="location.reload()" class="btn btn-outline-danger btn-sm mt-3">Start Over</button>
+            <div class="text-center mt-3">
+                <button onclick="location.reload()" class="btn btn-outline-danger btn-sm">Start Over (重新開始)</button>
+            </div>
         </div>
     </div>
 </div>
@@ -110,11 +132,12 @@
         const personality = document.getElementById('inputPersonality').value || "nice";
         const dream = document.getElementById('inputDream').value || "undecided";
 
+        // 根據年級設定難度提示
         let levelInstruction = grade === "Senior Form" 
             ? "Use complex sentence structures, relative clauses, and DSE-level vocabulary." 
             : "Use simple grammar (Present Tense), short sentences, and easy vocabulary.";
 
-        // 構建 System Prompt (第一條指令)
+        // 構建 System Prompt
         const prompt = `
         Role: You are a helpful Hong Kong secondary school English teacher.
         Task: Write a self-introduction for a student.
@@ -146,10 +169,10 @@
         await callGemini(text);
     }
 
-    // 核心功能：呼叫 Gemini API (使用 fetch)
+    // 核心功能：呼叫 Gemini API
     async function callGemini(userText) {
-        if (API_KEY === "YOUR_GEMINI_API_KEY_HERE") {
-            alert("請先在代碼中填入您的 API Key！");
+        if (API_KEY === "YOUR_GEMINI_API_KEY_HERE" || API_KEY === "") {
+            alert("請先在代碼第 106 行填入您的 API Key！");
             return;
         }
 
@@ -174,8 +197,10 @@
         };
 
         try {
-            // 3. 直接發送請求到 Google (不經過 PHP)
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+            // ★ 修改重點：使用 'gemini-pro' 模型，確保穩定性 ★
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
+            
+            const response = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(requestBody)
@@ -183,9 +208,12 @@
 
             const data = await response.json();
 
+            // 錯誤處理
             if (data.error) {
-                addMessageToUI('model', "⚠️ Error: " + data.error.message);
+                console.error("API Error Details:", data.error);
+                addMessageToUI('model', `⚠️ Error: ${data.error.message}`);
             } else {
+                // 成功獲取文字
                 const aiText = data.candidates[0].content.parts[0].text;
                 addMessageToUI('model', aiText);
 
@@ -198,7 +226,7 @@
 
         } catch (error) {
             console.error(error);
-            addMessageToUI('model', "⚠️ Connection Error. Please check your internet or API Key.");
+            addMessageToUI('model', "⚠️ Connection Error. Please check your internet.");
         } finally {
             loading.style.display = 'none';
             sendBtn.disabled = false;
@@ -211,7 +239,7 @@
         const div = document.createElement('div');
         div.className = `message ${role}`;
         
-        // 使用 Marked.js 將 Markdown 轉為 HTML (例如 **粗體** 變 <b>)
+        // 使用 Marked.js 將 Markdown 轉為 HTML
         div.innerHTML = marked.parse(text);
         
         chatBox.appendChild(div);
