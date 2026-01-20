@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 智能深蹲教練</title>
+    <title>AI 嚴格版深蹲教練</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -21,7 +21,7 @@
             color: white;
         }
 
-        h1 { margin-bottom: 15px; }
+        h1 { margin-bottom: 15px; text-align: center;}
 
         .container {
             position: relative;
@@ -52,13 +52,29 @@
         .label { font-size: 12px; font-weight: bold; opacity: 0.9; }
         .value { font-size: 28px; font-weight: bold; }
 
-        /* === 新增：控制面板 (下方滑桿) === */
+        /* 警告訊息 (用來提示手沒舉起來) */
+        #warning-msg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 0, 0, 0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 32px;
+            font-weight: bold;
+            display: none; /* 預設隱藏 */
+            z-index: 20;
+            text-align: center;
+        }
+
+        /* 控制面板 */
         .controls {
             position: absolute;
-            bottom: 0;
-            left: 0;
+            bottom: 0; left: 0;
             width: 100%;
-            background-color: rgba(0, 0, 0, 0.7); /* 半透明黑底 */
+            background-color: rgba(0, 0, 0, 0.7);
             padding: 10px 20px;
             box-sizing: border-box;
             display: flex;
@@ -67,38 +83,21 @@
             gap: 15px;
             z-index: 10;
         }
-
-        .control-label { font-size: 16px; font-weight: bold; }
         
-        /* 滑桿樣式 */
-        input[type=range] {
-            width: 200px;
-            cursor: pointer;
-        }
-        
-        /* 顯示目前設定的角度 */
-        #angle-val {
-            color: #f1c40f; /* 金黃色 */
-            font-size: 20px;
-            font-weight: bold;
-            min-width: 50px;
-        }
-
-        #loading {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 24px;
-        }
+        input[type=range] { width: 200px; cursor: pointer; }
+        #angle-val { color: #f1c40f; font-size: 20px; font-weight: bold; min-width: 50px; }
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; }
     </style>
 </head>
 <body>
 
-    <h1>🏋️‍♂️ AI 深蹲教練</h1>
+    <h1>🏋️‍♂️ 雙腿 + 平舉 嚴格偵測</h1>
 
     <div class="container">
         <div id="loading">載入模型中...</div>
         
+        <div id="warning-msg">請平舉雙手！<br>(Raise Hands)</div>
+
         <div class="scoreboard">
             <div class="score-item">
                 <span class="label">次數 (REPS)</span>
@@ -111,8 +110,8 @@
         </div>
 
         <div class="controls">
-            <span class="control-label">設定難度 (目標角度):</span>
-            <input type="range" id="angle-slider" min="90" max="150" value="90" step="5">
+            <span style="font-size:16px; font-weight:bold;">腿部目標角度:</span>
+            <input type="range" id="angle-slider" min="80" max="150" value="90" step="5">
             <span id="angle-val">90°</span>
         </div>
 
@@ -127,23 +126,21 @@
         const repsDisplay = document.getElementById('reps-display');
         const stageDisplay = document.getElementById('stage-display');
         const loadingMsg = document.getElementById('loading');
+        const warningMsg = document.getElementById('warning-msg');
         
-        // 新增：獲取滑桿元素
         const angleSlider = document.getElementById('angle-slider');
         const angleValDisplay = document.getElementById('angle-val');
 
         let count = 0;
         let stage = null;
-        
-        // 預設目標角度
         let targetAngle = 90;
 
-        // === 監聽滑桿變化 ===
         angleSlider.addEventListener('input', function() {
-            targetAngle = this.value; // 更新目標變數
-            angleValDisplay.innerText = this.value + "°"; // 更新畫面上顯示的數字
+            targetAngle = this.value;
+            angleValDisplay.innerText = this.value + "°";
         });
 
+        // 計算三點角度
         function calculateAngle(a, b, c) {
             const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
             let angle = Math.abs(radians * 180.0 / Math.PI);
@@ -159,45 +156,91 @@
 
             if (results.poseLandmarks) {
                 const landmarks = results.poseLandmarks;
-                const hip = landmarks[23];
-                const knee = landmarks[25];
-                const ankle = landmarks[27];
-                
-                if (hip.visibility > 0.5 && knee.visibility > 0.5 && ankle.visibility > 0.5) {
-                    const angle = calculateAngle(hip, knee, ankle);
 
-                    // 繪製即時角度
+                // === 1. 獲取關鍵點 (左腿 + 右腿) ===
+                const leftHip = landmarks[23];
+                const leftKnee = landmarks[25];
+                const leftAnkle = landmarks[27];
+
+                const rightHip = landmarks[24];
+                const rightKnee = landmarks[26];
+                const rightAnkle = landmarks[28];
+
+                // === 2. 獲取關鍵點 (左手 + 右手) 用於判斷平舉 ===
+                // 我們計算 "手肘-肩膀-髖部" 的角度，如果腋下打開約 90 度，代表手平舉
+                const leftShoulder = landmarks[11];
+                const leftElbow = landmarks[13];
+                // leftHip 已經有了
+
+                const rightShoulder = landmarks[12];
+                const rightElbow = landmarks[14];
+                // rightHip 已經有了
+
+                // 檢查信心度 (確保全身入鏡)
+                const visibilityThreshold = 0.5;
+                const isLegsVisible = leftHip.visibility > visibilityThreshold && leftKnee.visibility > visibilityThreshold && leftAnkle.visibility > visibilityThreshold &&
+                                      rightHip.visibility > visibilityThreshold && rightKnee.visibility > visibilityThreshold && rightAnkle.visibility > visibilityThreshold;
+                
+                if (isLegsVisible) {
+                    // --- A. 計算腿部角度 ---
+                    const angleLeftLeg = calculateAngle(leftHip, leftKnee, leftAnkle);
+                    const angleRightLeg = calculateAngle(rightHip, rightKnee, rightAnkle);
+                    
+                    // --- B. 計算腋下角度 (手臂是否抬起) ---
+                    // 順序：手肘 - 肩膀 - 髖部
+                    const angleLeftArm = calculateAngle(leftElbow, leftShoulder, leftHip);
+                    const angleRightArm = calculateAngle(rightElbow, rightShoulder, rightHip);
+
+                    // 繪製腿部角度數值 (平均值或分開顯示，這裡顯示左腿代表)
                     canvasCtx.fillStyle = 'white';
                     canvasCtx.font = '24px Arial';
-                    canvasCtx.fillText(Math.round(angle), knee.x * canvasElement.width, knee.y * canvasElement.height);
+                    canvasCtx.fillText(Math.round(angleLeftLeg), leftKnee.x * canvasElement.width + 10, leftKnee.y * canvasElement.height);
+                    canvasCtx.fillText(Math.round(angleRightLeg), rightKnee.x * canvasElement.width - 40, rightKnee.y * canvasElement.height);
 
-                    // === 深蹲邏輯 (使用 targetAngle 變數) ===
-                    if (angle > 160) {
-                        stage = "UP";
-                    }
-                    // 這裡改成了 targetAngle (原本是 90)
-                    if (angle < targetAngle && stage === 'UP') {
-                        stage = "DOWN";
-                        count++;
-                        repsDisplay.innerText = count;
-                    }
-                    stageDisplay.innerText = stage || "Stand";
-
-                    // === 變色邏輯 (同樣連動 targetAngle) ===
-                    let lineColor = '#00FF00';
-                    let lineWidth = 4;
+                    // === C. 邏輯判定核心 ===
                     
-                    if (angle < targetAngle) {
-                        lineColor = '#00FF00'; // 達標變綠
-                        lineWidth = 8;
-                    } else {
-                        lineColor = '#FF0000'; // 未達標紅色
-                    }
+                    // 1. 判斷手是否放下 (角度太小，例如小於 70度)
+                    // 這邊設定 70 度比較寬容，只要稍微舉起來就算
+                    const isHandsUp = (angleLeftArm > 70) && (angleRightArm > 70);
 
-                    drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS,
-                                 {color: lineColor, lineWidth: lineWidth});
-                    drawLandmarks(canvasCtx, results.poseLandmarks,
-                                {color: lineColor, lineWidth: 2, radius: 4});
+                    if (!isHandsUp) {
+                        // 手沒舉起來 -> 顯示警告，暫停計數
+                        warningMsg.style.display = "block"; 
+                        // 畫線改為灰色，表示無效
+                        drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#999999', lineWidth: 2});
+                    } else {
+                        // 手有舉起來 -> 隱藏警告，開始運作
+                        warningMsg.style.display = "none";
+
+                        // 2. 深蹲邏輯 (雙腿都要達標)
+                        // 站直判定：雙腿都要 > 160
+                        if (angleLeftLeg > 160 && angleRightLeg > 160) {
+                            stage = "UP";
+                        }
+                        
+                        // 蹲低判定：雙腿都要 < 目標角度 且 狀態是 UP
+                        if (angleLeftLeg < targetAngle && angleRightLeg < targetAngle && stage === 'UP') {
+                            stage = "DOWN";
+                            count++;
+                            repsDisplay.innerText = count;
+                        }
+
+                        stageDisplay.innerText = stage || "Stand";
+
+                        // 3. 變色反饋 (雙腿達標變綠，否則紅)
+                        let lineColor = '#FF0000'; // 紅
+                        let lineWidth = 4;
+
+                        if (angleLeftLeg < targetAngle && angleRightLeg < targetAngle) {
+                            lineColor = '#00FF00'; // 綠
+                            lineWidth = 8;
+                        }
+
+                        drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS,
+                                     {color: lineColor, lineWidth: lineWidth});
+                        drawLandmarks(canvasCtx, results.poseLandmarks,
+                                    {color: lineColor, lineWidth: 2, radius: 4});
+                    }
                 }
             }
             canvasCtx.restore();
@@ -227,4 +270,3 @@
     </script>
 </body>
 </html>
-
