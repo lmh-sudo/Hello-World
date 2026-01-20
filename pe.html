@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 專業深蹲計數 (完成動作才計分)</title>
+    <title>AI 專業深蹲計數 (+1特效版)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -55,8 +55,7 @@
         /* 警告訊息 */
         #warning-msg {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             background-color: rgba(255, 0, 0, 0.8);
             color: white;
@@ -89,15 +88,56 @@
         input[type=range] { width: 200px; cursor: pointer; }
         #angle-val { color: #f1c40f; font-size: 20px; font-weight: bold; min-width: 50px; }
         #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; }
+
+        /* === 新增：+1 特效的樣式 === */
+        #plus-one-effect {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            /* 初始狀態：置中，但透明度為 0 (隱藏) */
+            transform: translate(-50%, -50%) scale(0.5);
+            font-size: 100px; /* 字體超大 */
+            font-weight: 900;
+            color: #f1c40f; /* 金黃色 */
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.7); /* 文字陰影增加立體感 */
+            opacity: 0; 
+            pointer-events: none; /* 讓滑鼠點擊穿透它，不影響操作 */
+            z-index: 30; /* 在最上層 */
+        }
+
+        /* 定義動畫關鍵影格：彈出並向上淡出 */
+        @keyframes popUpAndFadeOut {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -40%) scale(0.5); /* 從稍微下方開始，比較小 */
+            }
+            20% {
+                opacity: 1; /* 瞬間顯示 */
+                transform: translate(-50%, -50%) scale(1.2); /* 彈到中間並放大 */
+            }
+            100% {
+                opacity: 0; /* 最後淡出 */
+                transform: translate(-50%, -80%) scale(1); /* 向上飄移 */
+            }
+        }
+
+        /* 用來觸發動畫的 class */
+        .trigger-animation {
+            /* 執行動畫：名稱 時間 曲線 僅執行一次 */
+            animation: popUpAndFadeOut 0.8s ease-out forwards;
+        }
+
     </style>
 </head>
 <body>
 
-    <h1>🏋️‍♂️ 完整動作才計分</h1>
+    <h1>🏋️‍♂️ 完整動作才計分 (+1特效)</h1>
 
     <div class="container">
         <div id="loading">載入模型中...</div>
         
+        <div id="plus-one-effect">+1</div>
+
         <div id="warning-msg">⚠️ 請張開雙手<br><span style="font-size:18px">(雙手離開身體兩側)</span></div>
 
         <div class="scoreboard">
@@ -129,13 +169,20 @@
         const stageDisplay = document.getElementById('stage-display');
         const loadingMsg = document.getElementById('loading');
         const warningMsg = document.getElementById('warning-msg');
-        
         const angleSlider = document.getElementById('angle-slider');
         const angleValDisplay = document.getElementById('angle-val');
+        
+        // 新增：獲取特效元素
+        const plusOneElem = document.getElementById('plus-one-effect');
 
         let count = 0;
-        let stage = null; // UP 或 DOWN
+        let stage = null;
         let targetAngle = 90;
+
+        // 監聽動畫結束事件：當動畫播完後，立刻移除 trigger class，以便下次可以再觸發
+        plusOneElem.addEventListener('animationend', () => {
+            plusOneElem.classList.remove('trigger-animation');
+        });
 
         angleSlider.addEventListener('input', function() {
             targetAngle = this.value;
@@ -157,17 +204,10 @@
 
             if (results.poseLandmarks) {
                 const landmarks = results.poseLandmarks;
-
-                const leftHip = landmarks[23];
-                const leftKnee = landmarks[25];
-                const leftAnkle = landmarks[27];
-                const rightHip = landmarks[24];
-                const rightKnee = landmarks[26];
-                const rightAnkle = landmarks[28];
-                const leftShoulder = landmarks[11];
-                const leftElbow = landmarks[13];
-                const rightShoulder = landmarks[12];
-                const rightElbow = landmarks[14];
+                const leftHip = landmarks[23]; const leftKnee = landmarks[25]; const leftAnkle = landmarks[27];
+                const rightHip = landmarks[24]; const rightKnee = landmarks[26]; const rightAnkle = landmarks[28];
+                const leftShoulder = landmarks[11]; const leftElbow = landmarks[13];
+                const rightShoulder = landmarks[12]; const rightElbow = landmarks[14];
 
                 const visibilityThreshold = 0.5;
                 const isLegsVisible = leftHip.visibility > visibilityThreshold && leftKnee.visibility > visibilityThreshold && leftAnkle.visibility > visibilityThreshold &&
@@ -179,13 +219,11 @@
                     const angleLeftArm = calculateAngle(leftElbow, leftShoulder, leftHip);
                     const angleRightArm = calculateAngle(rightElbow, rightShoulder, rightHip);
 
-                    // 顯示腿部角度
                     canvasCtx.fillStyle = 'white';
                     canvasCtx.font = '24px Arial';
                     canvasCtx.fillText(Math.round(angleLeftLeg), leftKnee.x * canvasElement.width + 10, leftKnee.y * canvasElement.height);
                     canvasCtx.fillText(Math.round(angleRightLeg), rightKnee.x * canvasElement.width - 40, rightKnee.y * canvasElement.height);
 
-                    // 手臂判定 (40度寬容版)
                     const armThreshold = 40; 
                     const isHandsUp = (angleLeftArm > armThreshold) && (angleRightArm > armThreshold);
 
@@ -195,46 +233,38 @@
                     } else {
                         warningMsg.style.display = "none";
 
-                        // === 修改後的計數核心邏輯 ===
-                        
-                        // 1. 蹲下階段 (Going Down)
-                        // 當雙腳角度小於目標值時，將狀態標記為 "DOWN"
-                        // 這裡還不計分，只是記錄「你已經蹲下去了」
+                        // 1. 蹲下階段
                         if (angleLeftLeg < targetAngle && angleRightLeg < targetAngle) {
                             if (stage === 'UP') {
                                 stage = "DOWN";
                             }
                         }
 
-                        // 2. 站起階段 (Coming Up) - 這是加分時刻！
-                        // 當雙腳角度大於 160 (站直)，且之前的狀態是 "DOWN"
+                        // 2. 站起階段 (計分時刻)
                         if (angleLeftLeg > 160 && angleRightLeg > 160) {
                             if (stage === 'DOWN') {
                                 count++;
                                 repsDisplay.innerText = count;
-                                stage = "UP"; // 重置為站立狀態，準備下一次
+                                stage = "UP"; 
+
+                                // === 在這裡觸發 +1 特效 ===
+                                // 加上這個 class 就會開始播放 CSS 動畫
+                                plusOneElem.classList.add('trigger-animation');
                             } else if (stage === null) {
-                                // 剛開始偵測到站立
                                 stage = "UP";
                             }
                         }
 
                         stageDisplay.innerText = stage || "Stand";
 
-                        // 3. 視覺反饋 (顏色)
-                        // 注意：這裡的顏色邏輯是即時的，讓你蹲下去時能看到綠線，知道自己蹲夠低了
                         let lineColor = '#FF0000'; 
                         let lineWidth = 4;
-
                         if (angleLeftLeg < targetAngle && angleRightLeg < targetAngle) {
-                            lineColor = '#00FF00'; // 蹲夠低變綠色
+                            lineColor = '#00FF00'; 
                             lineWidth = 8;
                         }
-
-                        drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS,
-                                     {color: lineColor, lineWidth: lineWidth});
-                        drawLandmarks(canvasCtx, results.poseLandmarks,
-                                    {color: lineColor, lineWidth: 2, radius: 4});
+                        drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: lineColor, lineWidth: lineWidth});
+                        drawLandmarks(canvasCtx, results.poseLandmarks, {color: lineColor, lineWidth: 2, radius: 4});
                     }
                 }
             }
@@ -244,20 +274,15 @@
         const pose = new Pose({locateFile: (file) => {
             return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
         }});
-
         pose.setOptions({
             modelComplexity: 1,
             smoothLandmarks: true,
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5
         });
-
         pose.onResults(onResults);
-
         const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await pose.send({image: videoElement});
-            },
+            onFrame: async () => { await pose.send({image: videoElement}); },
             width: 640,
             height: 480
         });
