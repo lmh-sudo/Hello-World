@@ -201,7 +201,7 @@
                     
                     // 1. 判斷手是否放下 (角度太小，例如小於 70度)
                     // 這邊設定 70 度比較寬容，只要稍微舉起來就算
-                    const isHandsUp = (angleLeftArm > 60) && (angleRightArm > 60);
+                    const isHandsUp = (angleLeftArm > 40) && (angleRightArm > 40);
 
                     if (!isHandsUp) {
                         // 手沒舉起來 -> 顯示警告，暫停計數
@@ -270,5 +270,6 @@
     </script>
 </body>
 </html>
+
 
 
