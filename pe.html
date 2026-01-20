@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 深蹲教練 (網頁版)</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { margin-bottom: 10px; color: #333; }
+
+        .container {
+            position: relative;
+            width: 640px;
+            height: 480px;
+            background-color: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+
+        /* 隱藏原始 video 元素，我們只看 canvas 繪圖結果 */
+        #input_video { display: none; }
+
+        /* 畫布疊加 */
+        #output_canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 左上角的計分板 */
+        .scoreboard {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background-color: rgba(245, 117, 16, 0.8);
+            padding: 15px 25px;
+            border-bottom-right-radius: 15px;
+            color: white;
+            display: flex;
+            gap: 30px;
+        }
+
+        .score-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .label { font-size: 14px; font-weight: bold; }
+        .value { font-size: 32px; font-weight: bold; }
+
+        /* 載入中的遮罩 */
+        #loading {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🏋️‍♂️ AI 深蹲計數器</h1>
+
+    <div class="container">
+        <div id="loading">載入模型中，請稍候...</div>
+        <div class="scoreboard">
+            <div class="score-item">
+                <span class="label">次數 (REPS)</span>
+                <span id="reps-display" class="value">0</span>
+            </div>
+            <div class="score-item">
+                <span class="label">狀態 (STAGE)</span>
+                <span id="stage-display" class="value">-</span>
+            </div>
+        </div>
+
+        <video id="input_video"></video>
+        <canvas id="output_canvas" width="640" height="480"></canvas>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const repsDisplay = document.getElementById('reps-display');
+        const stageDisplay = document.getElementById('stage-display');
+        const loadingMsg = document.getElementById('loading');
+
+        let count = 0;
+        let stage = null;
+
+        // --- 數學計算函數 (跟 Python 版邏輯一樣) ---
+        function calculateAngle(a, b, c) {
+            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            if (angle > 180.0) angle = 360 - angle;
+            return angle;
+        }
+
+        // --- 每一幀的處理邏輯 ---
+        function onResults(results) {
+            // 隱藏載入文字
+            loadingMsg.style.display = 'none';
+
+            // 1. 繪製背景影像
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            if (results.poseLandmarks) {
+                const landmarks = results.poseLandmarks;
+
+                // 2. 獲取關鍵點 (左半邊)
+                // MediaPipe JS 的點是 0~1 的比例，不需要像 Python 那樣 .value 取值
+                const hip = landmarks[23];  // LEFT_HIP
+                const knee = landmarks[25]; // LEFT_KNEE
+                const ankle = landmarks[27]; // LEFT_ANKLE
+                
+                // 檢查信心度 (防止誤判)
+                if (hip.visibility > 0.5 && knee.visibility > 0.5 && ankle.visibility > 0.5) {
+                    
+                    // 計算角度
+                    const angle = calculateAngle(hip, knee, ankle);
+
+                    // 繪製角度數字
+                    canvasCtx.fillStyle = 'white';
+                    canvasCtx.font = '24px Arial';
+                    canvasCtx.fillText(Math.round(angle), knee.x * canvasElement.width, knee.y * canvasElement.height);
+
+                    // --- 深蹲邏輯 ---
+                    if (angle > 160) {
+                        stage = "UP";
+                    }
+                    if (angle < 90 && stage === 'UP') {
+                        stage = "DOWN";
+                        count++;
+                        repsDisplay.innerText = count;
+                    }
+                    stageDisplay.innerText = stage || "Stand";
+
+                    // --- 變色邏輯 ---
+                    let lineColor = '#00FF00'; // 預設綠色 (MediaPipe 預設)
+                    let lineWidth = 4;
+                    
+                    if (angle < 90) {
+                        // 蹲低時變亮綠色且加粗
+                        lineColor = '#00FF00';
+                        lineWidth = 8;
+                    } else {
+                        // 平常顯示紅色
+                        lineColor = '#FF0000';
+                    }
+
+                    // 3. 繪製骨架
+                    drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS,
+                                 {color: lineColor, lineWidth: lineWidth});
+                    drawLandmarks(canvasCtx, results.poseLandmarks,
+                                {color: lineColor, lineWidth: 2, radius: 4});
+                }
+            }
+            canvasCtx.restore();
+        }
+
+        // --- 初始化 MediaPipe Pose ---
+        const pose = new Pose({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+        }});
+
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        pose.onResults(onResults);
+
+        // --- 啟動攝影機 ---
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await pose.send({image: videoElement});
+            },
+            width: 640,
+            height: 480
+        });
+        camera.start();
+    </script>
+</body>
+</html>
