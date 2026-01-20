@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 深蹲教練</title>
+    <title>AI 專業深蹲計數 (完成動作才計分)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -21,7 +21,7 @@
             color: white;
         }
 
-        h1 { margin-bottom: 15px; text-align: center;}
+        h1 { margin-bottom: 10px; text-align: center; font-size: 24px;}
 
         .container {
             position: relative;
@@ -52,21 +52,23 @@
         .label { font-size: 12px; font-weight: bold; opacity: 0.9; }
         .value { font-size: 28px; font-weight: bold; }
 
-        /* 警告訊息 (用來提示手沒舉起來) */
+        /* 警告訊息 */
         #warning-msg {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background-color: rgba(255, 0, 0, 0.7);
+            background-color: rgba(255, 0, 0, 0.8);
             color: white;
-            padding: 20px;
-            border-radius: 10px;
-            font-size: 32px;
+            padding: 30px;
+            border-radius: 15px;
+            font-size: 28px;
             font-weight: bold;
-            display: none; /* 預設隱藏 */
+            display: none;
             z-index: 20;
             text-align: center;
+            line-height: 1.5;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
 
         /* 控制面板 */
@@ -91,12 +93,12 @@
 </head>
 <body>
 
-    <h1>🏋️‍♂️ 深蹲教練</h1>
+    <h1>🏋️‍♂️ 完整動作才計分</h1>
 
     <div class="container">
         <div id="loading">載入模型中...</div>
         
-        <div id="warning-msg">請平舉雙手！<br>(Raise Hands)</div>
+        <div id="warning-msg">⚠️ 請張開雙手<br><span style="font-size:18px">(雙手離開身體兩側)</span></div>
 
         <div class="scoreboard">
             <div class="score-item">
@@ -110,7 +112,7 @@
         </div>
 
         <div class="controls">
-            <span style="font-size:16px; font-weight:bold;">腿部目標角度:</span>
+            <span style="font-size:16px; font-weight:bold;">腿部難度:</span>
             <input type="range" id="angle-slider" min="80" max="150" value="90" step="5">
             <span id="angle-val">90°</span>
         </div>
@@ -132,7 +134,7 @@
         const angleValDisplay = document.getElementById('angle-val');
 
         let count = 0;
-        let stage = null;
+        let stage = null; // UP 或 DOWN
         let targetAngle = 90;
 
         angleSlider.addEventListener('input', function() {
@@ -140,7 +142,6 @@
             angleValDisplay.innerText = this.value + "°";
         });
 
-        // 計算三點角度
         function calculateAngle(a, b, c) {
             const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
             let angle = Math.abs(radians * 180.0 / Math.PI);
@@ -157,82 +158,76 @@
             if (results.poseLandmarks) {
                 const landmarks = results.poseLandmarks;
 
-                // === 1. 獲取關鍵點 (左腿 + 右腿) ===
                 const leftHip = landmarks[23];
                 const leftKnee = landmarks[25];
                 const leftAnkle = landmarks[27];
-
                 const rightHip = landmarks[24];
                 const rightKnee = landmarks[26];
                 const rightAnkle = landmarks[28];
-
-                // === 2. 獲取關鍵點 (左手 + 右手) 用於判斷平舉 ===
-                // 我們計算 "手肘-肩膀-髖部" 的角度，如果腋下打開約 90 度，代表手平舉
                 const leftShoulder = landmarks[11];
                 const leftElbow = landmarks[13];
-                // leftHip 已經有了
-
                 const rightShoulder = landmarks[12];
                 const rightElbow = landmarks[14];
-                // rightHip 已經有了
 
-                // 檢查信心度 (確保全身入鏡)
                 const visibilityThreshold = 0.5;
                 const isLegsVisible = leftHip.visibility > visibilityThreshold && leftKnee.visibility > visibilityThreshold && leftAnkle.visibility > visibilityThreshold &&
                                       rightHip.visibility > visibilityThreshold && rightKnee.visibility > visibilityThreshold && rightAnkle.visibility > visibilityThreshold;
                 
                 if (isLegsVisible) {
-                    // --- A. 計算腿部角度 ---
                     const angleLeftLeg = calculateAngle(leftHip, leftKnee, leftAnkle);
                     const angleRightLeg = calculateAngle(rightHip, rightKnee, rightAnkle);
-                    
-                    // --- B. 計算腋下角度 (手臂是否抬起) ---
-                    // 順序：手肘 - 肩膀 - 髖部
                     const angleLeftArm = calculateAngle(leftElbow, leftShoulder, leftHip);
                     const angleRightArm = calculateAngle(rightElbow, rightShoulder, rightHip);
 
-                    // 繪製腿部角度數值 (平均值或分開顯示，這裡顯示左腿代表)
+                    // 顯示腿部角度
                     canvasCtx.fillStyle = 'white';
                     canvasCtx.font = '24px Arial';
                     canvasCtx.fillText(Math.round(angleLeftLeg), leftKnee.x * canvasElement.width + 10, leftKnee.y * canvasElement.height);
                     canvasCtx.fillText(Math.round(angleRightLeg), rightKnee.x * canvasElement.width - 40, rightKnee.y * canvasElement.height);
 
-                    // === C. 邏輯判定核心 ===
-                    
-                    // 1. 判斷手是否放下 (角度太小，例如小於 70度)
-                    // 這邊設定 70 度比較寬容，只要稍微舉起來就算
-                    const isHandsUp = (angleLeftArm > 40) && (angleRightArm > 40);
+                    // 手臂判定 (40度寬容版)
+                    const armThreshold = 40; 
+                    const isHandsUp = (angleLeftArm > armThreshold) && (angleRightArm > armThreshold);
 
                     if (!isHandsUp) {
-                        // 手沒舉起來 -> 顯示警告，暫停計數
                         warningMsg.style.display = "block"; 
-                        // 畫線改為灰色，表示無效
                         drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#999999', lineWidth: 2});
                     } else {
-                        // 手有舉起來 -> 隱藏警告，開始運作
                         warningMsg.style.display = "none";
 
-                        // 2. 深蹲邏輯 (雙腿都要達標)
-                        // 站直判定：雙腿都要 > 160
-                        if (angleLeftLeg > 160 && angleRightLeg > 160) {
-                            stage = "UP";
-                        }
+                        // === 修改後的計數核心邏輯 ===
                         
-                        // 蹲低判定：雙腿都要 < 目標角度 且 狀態是 UP
-                        if (angleLeftLeg < targetAngle && angleRightLeg < targetAngle && stage === 'UP') {
-                            stage = "DOWN";
-                            count++;
-                            repsDisplay.innerText = count;
+                        // 1. 蹲下階段 (Going Down)
+                        // 當雙腳角度小於目標值時，將狀態標記為 "DOWN"
+                        // 這裡還不計分，只是記錄「你已經蹲下去了」
+                        if (angleLeftLeg < targetAngle && angleRightLeg < targetAngle) {
+                            if (stage === 'UP') {
+                                stage = "DOWN";
+                            }
+                        }
+
+                        // 2. 站起階段 (Coming Up) - 這是加分時刻！
+                        // 當雙腳角度大於 160 (站直)，且之前的狀態是 "DOWN"
+                        if (angleLeftLeg > 160 && angleRightLeg > 160) {
+                            if (stage === 'DOWN') {
+                                count++;
+                                repsDisplay.innerText = count;
+                                stage = "UP"; // 重置為站立狀態，準備下一次
+                            } else if (stage === null) {
+                                // 剛開始偵測到站立
+                                stage = "UP";
+                            }
                         }
 
                         stageDisplay.innerText = stage || "Stand";
 
-                        // 3. 變色反饋 (雙腿達標變綠，否則紅)
-                        let lineColor = '#FF0000'; // 紅
+                        // 3. 視覺反饋 (顏色)
+                        // 注意：這裡的顏色邏輯是即時的，讓你蹲下去時能看到綠線，知道自己蹲夠低了
+                        let lineColor = '#FF0000'; 
                         let lineWidth = 4;
 
                         if (angleLeftLeg < targetAngle && angleRightLeg < targetAngle) {
-                            lineColor = '#00FF00'; // 綠
+                            lineColor = '#00FF00'; // 蹲夠低變綠色
                             lineWidth = 8;
                         }
 
@@ -270,6 +265,3 @@
     </script>
 </body>
 </html>
-
-
-
