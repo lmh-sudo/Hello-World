@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 專業深蹲計數 (+1特效版)</title>
+    <title>AI 專業深蹲教練</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -96,7 +96,7 @@
             left: 50%;
             /* 初始狀態：置中，但透明度為 0 (隱藏) */
             transform: translate(-50%, -50%) scale(0.5);
-            font-size: 100px; /* 字體超大 */
+            font-size: 150px; /* 字體超大 */
             font-weight: 900;
             color: #f1c40f; /* 金黃色 */
             text-shadow: 3px 3px 6px rgba(0,0,0,0.7); /* 文字陰影增加立體感 */
@@ -131,14 +131,14 @@
 </head>
 <body>
 
-    <h1>🏋️‍♂️ 完整動作才計分 (+1特效)</h1>
+    <h1>🏋️‍♂️ AI 專業深蹲教練</h1>
 
     <div class="container">
         <div id="loading">載入模型中...</div>
         
         <div id="plus-one-effect">+1</div>
 
-        <div id="warning-msg">⚠️ 請張開雙手<br><span style="font-size:18px">(雙手離開身體兩側)</span></div>
+        <div id="warning-msg">⚠️ 請平舉雙手！<br>(Raise Hands)</span></div>
 
         <div class="scoreboard">
             <div class="score-item">
@@ -290,3 +290,4 @@
     </script>
 </body>
 </html>
+
