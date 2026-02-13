@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 人臉識別 - 多人學習版</title>
-    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <title>AI 人臉識別 - 資料庫管理版</title>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #f0f2f5; padding: 20px; }
         
-        /* 版面配置：左邊是影片，右邊是學習列表 */
         .container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
         
         .video-section { position: relative; }
@@ -23,25 +22,50 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
             min-width: 300px;
             max-width: 400px;
+            height: fit-content;
         }
 
-        input { padding: 10px; font-size: 16px; width: 60%; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px;}
-        button { padding: 10px 15px; font-size: 16px; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 5px; width: 30%; }
+        h3 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        input { padding: 10px; font-size: 16px; width: 60%; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box;}
+        button#registerBtn { padding: 10px; font-size: 16px; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 5px; width: 35%; }
         button:disabled { background-color: #ccc; cursor: not-allowed; }
         
-        #status { display: block; margin: 10px 0; font-weight: bold; color: #555; }
+        #status { display: block; margin: 10px 0; font-weight: bold; color: #555; font-size: 0.9em; }
+
+        /* --- 名單列表樣式 --- */
+        ul { list-style-type: none; padding: 0; margin-top: 10px; max-height: 400px; overflow-y: auto; }
         
-        /* 學習名單的樣式 */
-        h3 { margin-top: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        ul { list-style-type: none; padding: 0; max-height: 400px; overflow-y: auto; }
-        li { background: #e8f5e9; margin: 5px 0; padding: 10px; border-radius: 5px; border-left: 5px solid #4CAF50; animation: fadeIn 0.5s; }
-        
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        li.face-item { 
+            background: #fff; 
+            margin: 8px 0; 
+            padding: 10px; 
+            border-radius: 8px; 
+            border: 1px solid #eee;
+            border-left: 5px solid #2196F3; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        li.face-item:hover {
+            background-color: #ffebee; /* 滑鼠移上去變淡紅色 */
+            border-left-color: #f44336;
+            transform: translateX(5px);
+        }
+
+        li.face-item .name { font-weight: bold; font-size: 1.1em; }
+        li.face-item .delete-hint { font-size: 0.8em; color: #999; }
+        li.face-item:hover .delete-hint { color: #d32f2f; font-weight: bold; content: "刪除"; }
+
+        .empty-list { color: #999; text-align: center; padding: 20px; border: 2px dashed #eee; border-radius: 10px;}
     </style>
 </head>
 <body>
 
-    <h1>🤖 AI 人臉資料庫構建體驗</h1>
+    <h1>🤖 AI 人臉資料庫管理系統</h1>
 
     <div class="container">
         <div class="video-section">
@@ -50,17 +74,16 @@
         </div>
 
         <div class="controls-section">
+            <h3>🎛️ 控制面板</h3>
             <div id="input-group">
-                <input type="text" id="nameInput" placeholder="輸入名字 (例如: 陳大文)">
-                <button id="registerBtn" disabled>學習</button>
+                <input type="text" id="nameInput" placeholder="輸入學生名字">
+                <button id="registerBtn" disabled>➕ 學習</button>
             </div>
-            <span id="status">⏳ 正在載入 AI 模型...</span>
+            <span id="status">⏳ 正在初始化 AI 模型...</span>
 
-            <h3>📚 已學習的人臉名單</h3>
+            <h3 style="margin-top: 20px;">📚 已學習名單 <small style="font-size:0.6em; color:#666; font-weight:normal">(點擊以刪除)</small></h3>
             <ul id="faceList">
-                <li style="background: #f1f1f1; border-left: 5px solid #ccc; color: #666;">
-                    ℹ️ 目前資料庫是空的
-                </li>
+                <li class="empty-list">目前沒有資料</li>
             </ul>
         </div>
     </div>
@@ -73,80 +96,120 @@
         const status = document.getElementById('status');
         const faceList = document.getElementById('faceList');
 
+        // 核心資料：儲存所有已學習的人臉數據
         let labeledFaceDescriptors = []; 
         let faceMatcher = null;          
 
-        // 1. 載入模型 (確保路徑正確)
+        // 1. 載入模型
         Promise.all([
             faceapi.nets.ssdMobilenetv1.loadFromUri('./models'),     
             faceapi.nets.faceLandmark68Net.loadFromUri('./models'),  
             faceapi.nets.faceRecognitionNet.loadFromUri('./models')  
-        ]).then(startVideo).catch(err => {
-            status.innerText = "❌ 模型載入失敗，請檢查 Console";
-            console.error(err);
-        });
+        ]).then(startVideo).catch(err => console.error("模型載入失敗", err));
 
-        // 2. 啟動視訊
         function startVideo() {
             navigator.mediaDevices.getUserMedia({ video: {} })
                 .then(stream => {
                     video.srcObject = stream;
-                    status.innerText = '🎥 請輸入名字並點擊「學習」';
+                    status.innerText = '✅ 系統就緒';
                 })
-                .catch(err => console.error("鏡頭錯誤:", err));
+                .catch(err => console.error(err));
         }
 
-        // 3. 處理「學習」按鈕點擊
+        // 2. 學習人臉
         registerBtn.addEventListener('click', async () => {
             const name = nameInput.value.trim();
-            if (!name) return alert('請先輸入名字！');
+            if (!name) return alert('請輸入名字！');
             
-            status.innerText = '🔄 正在分析臉部特徵...';
+            // 檢查名字是否重複
+            const isDuplicate = labeledFaceDescriptors.some(fd => fd.label === name);
+            if (isDuplicate) return alert('這個名字已經存在了，請使用不同名字！');
+
+            status.innerText = '📸 正在擷取特徵...';
             registerBtn.disabled = true;
 
-            // 偵測單張人臉
             const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
 
             if (detection) {
-                // A. 將數據加入記憶體
+                // 新增數據到陣列
                 const descriptor = [detection.descriptor];
-                labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(name, descriptor));
+                const newFace = new faceapi.LabeledFaceDescriptors(name, descriptor);
+                labeledFaceDescriptors.push(newFace);
                 
-                // B. 更新比對器
-                faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.6);
+                // 重建 AI 識別器
+                updateFaceMatcher();
                 
-                // C. 更新介面：新增一行到列表中
-                addFaceToList(name);
+                // 更新畫面列表
+                renderFaceList();
 
-                status.innerText = `✅ 系統已就緒，可識別：${name}`;
+                status.innerText = `🎉 已學習：${name}`;
                 nameInput.value = ''; 
             } else {
-                status.innerText = '⚠️ 找不到人臉，請靠近一點或調整光線。';
+                status.innerText = '⚠️ 偵測不到人臉，請正對鏡頭';
             }
             registerBtn.disabled = false;
         });
 
-        // 輔助函式：新增列表項目 (DOM 操作)
-        function addFaceToList(name) {
-            // 如果是第一次學習，先把「目前資料庫是空的」那行刪掉
-            if (labeledFaceDescriptors.length === 1) {
-                faceList.innerHTML = '';
+        // 3. 重建 AI 比對核心 (當新增或刪除時呼叫)
+        function updateFaceMatcher() {
+            if (labeledFaceDescriptors.length > 0) {
+                // 0.6 是容錯率，越低越嚴格
+                faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.6);
+            } else {
+                faceMatcher = null;
             }
-
-            const li = document.createElement('li');
-            const time = new Date().toLocaleTimeString(); // 加上時間戳記
-            li.innerHTML = `<strong>${name}</strong> <span style="font-size:0.8em; color:#666;">(${time})</span>`;
-            
-            // 將最新的加到最上面 (prepend)，如果要加到最下面用 appendChild
-            faceList.prepend(li);
         }
 
-        // 4. 影片播放時啟動循環偵測
+        // 4. 渲染名單列表 (包含刪除功能)
+        function renderFaceList() {
+            faceList.innerHTML = ''; // 清空目前的 HTML
+
+            if (labeledFaceDescriptors.length === 0) {
+                faceList.innerHTML = '<li class="empty-list">資料庫已清空</li>';
+                return;
+            }
+
+            // 遍歷所有數據，產生 HTML
+            labeledFaceDescriptors.forEach((fd, index) => {
+                const li = document.createElement('li');
+                li.className = 'face-item';
+                li.innerHTML = `
+                    <span class="name">${fd.label}</span>
+                    <span class="delete-hint">🗑️ 刪除</span>
+                `;
+                
+                // 點擊事件：刪除這個人
+                li.onclick = () => {
+                    if (confirm(`確定要刪除「${fd.label}」的資料嗎？`)) {
+                        deleteFace(index);
+                    }
+                };
+                
+                // 新增到列表最上方
+                faceList.prepend(li);
+            });
+        }
+
+        // 5. 刪除功能的實作
+        function deleteFace(index) {
+            const deletedName = labeledFaceDescriptors[index].label;
+            
+            // 從陣列中移除
+            labeledFaceDescriptors.splice(index, 1);
+            
+            // 更新 AI 和 介面
+            updateFaceMatcher();
+            renderFaceList();
+            
+            status.innerText = `🗑️ 已刪除：${deletedName}`;
+        }
+
+        // 6. 持續偵測迴圈
         video.addEventListener('play', () => {
             const displaySize = { width: video.width, height: video.height };
             faceapi.matchDimensions(canvas, displaySize);
             
-            registerBtn.disabled = false; // 影片開始後才允許按鈕
+            registerBtn.disabled = false;
 
             setInterval(async () => {
                 const detections = await faceapi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
@@ -155,18 +218,18 @@
 
                 if (faceMatcher) {
                     const results = resizedDetections.map(d => faceMatcher.findBestMatch(d.descriptor));
-                    
                     results.forEach((result, i) => {
                         const box = resizedDetections[i].detection.box;
                         const { label, distance } = result;
                         
-                        // 根據是否認識變更顏色 (unknown 為紅色，認識為綠色)
-                        const color = label === 'unknown' ? 'red' : '#00ff00';
+                        // 已知人臉為綠色，未知(unknown)為紅色
+                        const boxColor = label === 'unknown' ? 'rgba(255, 0, 0, 0.8)' : 'rgba(0, 255, 0, 0.8)';
                         
-                        const drawBox = new faceapi.draw.DrawBox(box, { label: label + ` (${Math.round(distance*100)/100})`, boxColor: color });
+                        const drawBox = new faceapi.draw.DrawBox(box, { label: `${label} (${Math.round(distance*100)/100})`, boxColor: boxColor });
                         drawBox.draw(canvas);
                     });
                 } else {
+                    // 如果沒有任何資料，只畫框框
                     faceapi.draw.drawDetections(canvas, resizedDetections);
                 }
             }, 100);
