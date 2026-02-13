@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 人臉識別體驗</title>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background-color: #f4f4f9; padding: 20px; }
+        .controls { margin-bottom: 20px; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: inline-block;}
+        input { padding: 8px; font-size: 16px; margin-right: 10px; }
+        button { padding: 8px 16px; font-size: 16px; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 4px; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #status { display: block; margin-top: 10px; font-weight: bold; color: #333; }
+        /* 讓 Canvas 疊加在 Video 上面，用來畫框框 */
+        #video-container { position: relative; display: inline-block; }
+        #video { border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        #canvas { position: absolute; top: 0; left: 0; }
+    </style>
+</head>
+<body>
+
+    <h1>🤖 人臉識別與學習系統</h1>
+    
+    <div class="controls">
+        <input type="text" id="nameInput" placeholder="請輸入你的名字">
+        <button id="registerBtn" disabled>📸 學習這張臉</button>
+        <span id="status">⏳ 正在載入 AI 模型，請稍候...</span>
+    </div>
+
+    <div id="video-container">
+        <video id="video" width="720" height="560" autoplay muted></video>
+        <canvas id="canvas" width="720" height="560"></canvas>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const nameInput = document.getElementById('nameInput');
+        const registerBtn = document.getElementById('registerBtn');
+        const status = document.getElementById('status');
+
+        let labeledFaceDescriptors = []; // 儲存已學習的人臉特徵資料
+        let faceMatcher = null;          // 人臉比對器
+
+        // 1. 載入 AI 模型 (請確保 models 資料夾存在並包含權重檔)
+        Promise.all([
+            faceapi.nets.ssdMobilenetv1.loadFromUri('./models'),     // 人臉檢測模型
+            faceapi.nets.faceLandmark68Net.loadFromUri('./models'),  // 臉部特徵點模型 (眼睛、鼻子等 68 個點)
+            faceapi.nets.faceRecognitionNet.loadFromUri('./models')  // 人臉特徵向量 (128維) 轉換模型
+        ]).then(startVideo).catch(err => console.error("模型載入失敗：", err));
+
+        // 2. 開啟 WebCam
+        function startVideo() {
+            status.innerText = '✅ 模型載入完成！正在開啟鏡頭...';
+            navigator.mediaDevices.getUserMedia({ video: {} })
+                .then(stream => {
+                    video.srcObject = stream;
+                    registerBtn.disabled = false;
+                    status.innerText = '🎥 系統就緒！請輸入名字並點擊「學習這張臉」';
+                })
+                .catch(err => {
+                    status.innerText = '❌ 無法存取鏡頭，請檢查權限。';
+                    console.error(err);
+                });
+        }
+
+        // 3. 學習人臉 (註冊)
+        registerBtn.addEventListener('click', async () => {
+            const name = nameInput.value.trim();
+            if (!name) return alert('請先輸入名字！');
+            
+            status.innerText = '🔄 正在擷取臉部特徵，請看著鏡頭...';
+            registerBtn.disabled = true;
+
+            // 擷取單張人臉並計算特徵 (Descriptor)
+            const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+
+            if (detection) {
+                // 將特徵與名字綁定，加入資料庫 (記憶體中)
+                const descriptor = [detection.descriptor];
+                labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(name, descriptor));
+                
+                // 建立或更新比對器 (容錯率設為 0.6，越低越嚴格)
+                faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.6);
+                
+                status.innerText = `🎉 成功學習：${name}！`;
+                nameInput.value = ''; // 清空輸入框
+            } else {
+                status.innerText = '⚠️ 找不到人臉！請確保光線充足並正對鏡頭。';
+            }
+            registerBtn.disabled = false;
+        });
+
+        // 4. 即時偵測與比對迴圈
+        video.addEventListener('play', () => {
+            // 設定畫布大小與影片一致
+            const displaySize = { width: video.width, height: video.height };
+            faceapi.matchDimensions(canvas, displaySize);
+
+            // 每 100 毫秒執行一次檢測
+            setInterval(async () => {
+                // 偵測畫面中所有人臉的特徵
+                const detections = await faceapi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
+
+                // 清空上一幀的畫布
+                canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+
+                if (faceMatcher) {
+                    // 如果系統已經學過人臉，進行比對
+                    const results = resizedDetections.map(d => faceMatcher.findBestMatch(d.descriptor));
+                    
+                    // 將結果畫在畫布上
+                    results.forEach((result, i) => {
+                        const box = resizedDetections[i].detection.box;
+                        // 如果是 known face，顯示名字；否則會顯示 unknown
+                        const drawBox = new faceapi.draw.DrawBox(box, { label: result.toString() });
+                        drawBox.draw(canvas);
+                    });
+                } else {
+                    // 如果系統還沒學過任何人，只畫出人臉的框框
+                    faceapi.draw.drawDetections(canvas, resizedDetections);
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>
