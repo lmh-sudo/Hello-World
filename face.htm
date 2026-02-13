@@ -116,7 +116,7 @@
                 .catch(err => console.error(err));
         }
 
-        // 2. 學習人臉
+        // 2. 學習人臉 (防呆升級版：限制單人)
         registerBtn.addEventListener('click', async () => {
             const name = nameInput.value.trim();
             if (!name) return alert('請輸入名字！');
@@ -125,14 +125,30 @@
             const isDuplicate = labeledFaceDescriptors.some(fd => fd.label === name);
             if (isDuplicate) return alert('這個名字已經存在了，請使用不同名字！');
 
-            status.innerText = '📸 正在擷取特徵...';
+            status.innerText = '🔍 正在檢查畫面人數...';
             registerBtn.disabled = true;
 
-            const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+            // --- 修改重點：改用 detectAllFaces 來計算人數 ---
+            const detections = await faceapi.detectAllFaces(video)
+                                            .withFaceLandmarks()
+                                            .withFaceDescriptors();
 
-            if (detection) {
+            // 情況 A：沒人
+            if (detections.length === 0) {
+                status.innerText = '⚠️ 偵測不到人臉，請正對鏡頭';
+                alert('找不到人臉！請靠近鏡頭。');
+            } 
+            // 情況 B：多人 (這是您要擋下的情況)
+            else if (detections.length > 1) {
+                status.innerText = `⚠️ 偵測到 ${detections.length} 張臉，請確保只有一個人在畫面中！`;
+                alert(`太擠了！偵測到 ${detections.length} 人。\nAI 會搞混，請確保鏡頭前只有 1 位同學。`);
+            } 
+            // 情況 C：剛好 1 人 (允許學習)
+            else {
+                const bestDetection = detections[0]; // 取出唯一的那個人
+                
                 // 新增數據到陣列
-                const descriptor = [detection.descriptor];
+                const descriptor = [bestDetection.descriptor];
                 const newFace = new faceapi.LabeledFaceDescriptors(name, descriptor);
                 labeledFaceDescriptors.push(newFace);
                 
@@ -142,11 +158,10 @@
                 // 更新畫面列表
                 renderFaceList();
 
-                status.innerText = `🎉 已學習：${name}`;
+                status.innerText = `🎉 成功學習單一人臉：${name}`;
                 nameInput.value = ''; 
-            } else {
-                status.innerText = '⚠️ 偵測不到人臉，請正對鏡頭';
             }
+            
             registerBtn.disabled = false;
         });
 
@@ -237,3 +252,4 @@
     </script>
 </body>
 </html>
+
