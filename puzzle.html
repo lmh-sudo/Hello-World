@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Puzzle - 手勢砌圖遊戲</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js" crossorigin="anonymous"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js"></script>
+
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'JetBrains Mono', monospace; background-color: #09090b; color: white; overflow: hidden; }
@@ -18,7 +21,7 @@
 
     <div class="mb-4 text-center">
         <h1 class="text-2xl font-bold tracking-widest neon-text uppercase">LIVE PUZZLE</h1>
-        <p class="text-zinc-400 text-xs mt-1">GitHub 版：雙手框選截圖，指尖捏合拖拽</p>
+        <p class="text-zinc-400 text-xs mt-1">請使用 Chrome/Edge 並確保開啟 WebCam</p>
     </div>
 
     <div id="canvas-container" class="bg-zinc-900 shadow-2xl">
@@ -27,30 +30,23 @@
 
         <div id="loading-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 z-50">
             <div class="w-10 h-10 border-4 border-zinc-800 border-t-[#ccff00] rounded-full animate-spin mb-4"></div>
-            <p id="loading-text" class="text-sm tracking-wider uppercase">載入 AI 模型中...</p>
+            <p id="loading-text" class="text-sm tracking-wider uppercase">正在初始化 AI 視覺模型...</p>
         </div>
 
         <div class="absolute top-4 right-4 z-20 text-[10px] text-white/70 bg-black/60 p-3 rounded-lg border border-white/10 text-right pointer-events-none">
             <div id="instruction-scanning">
                 <p class="font-bold text-[#ccff00] mb-1 underline">階段 1: 捕捉</p>
-                <p>1. 雙手比出 [ ] 框形</p>
-                <p>2. 同時捏合雙手 (Pinch) 截圖</p>
+                <p>雙手比出 [ ] 框形並捏合</p>
             </div>
             <div id="instruction-playing" class="hidden">
                 <p class="font-bold text-[#ccff00] mb-1 underline">階段 2: 拼圖</p>
-                <p>1. 單手捏合 拾取碎片</p>
-                <p>2. 拖拽至目標位置放開</p>
-                <p class="text-[#ccff00] mt-2 font-bold">握拳 (Fist) 1.5s 重置</p>
+                <p>單手捏合拖拽，握拳重置</p>
             </div>
-        </div>
-
-        <div id="timer-display" class="hidden absolute top-6 left-1/2 -translate-x-1/2 z-20 bg-black/80 px-4 py-2 rounded-full border border-[#ccff00]/30">
-            <span id="time-text" class="font-mono text-lg font-bold text-[#ccff00]">0:00</span>
         </div>
     </div>
 
     <script>
-        // --- 核心邏輯 ---
+        // --- 核心變數 ---
         let handLandmarker;
         const video = document.getElementById('video');
         const canvas = document.getElementById('gameCanvas');
@@ -60,22 +56,21 @@
         let gameState = 'SCANNING'; 
         let lastVideoTime = -1;
         const ROWS = 3, COLS = 3;
-        const PINCH_THRESHOLD = 0.05, FRAME_THRESHOLD = 0.1, RESET_DWELL_MS = 1500;
+        const PINCH_THRESHOLD = 0.05, FRAME_THRESHOLD = 0.1;
 
         let puzzleTiles = [], puzzleImageCanvas = null, gameBoardCoords = null;
-        let startTime = 0, timeElapsed = 0, fistHoldStart = null;
-        let dragInfo = { isDragging: false, tileIndex: null }, smoothCursor = { x: 0, y: 0 };
+        let startTime = 0, dragInfo = { isDragging: false, tileIndex: null }, smoothCursor = { x: 0, y: 0 };
         let lastFrameCoords = null;
 
-        // 初始化 AI 模型
+        // --- 初始化 MediaPipe ---
         async function initAI() {
             try {
-                // 使用全域物件 mediapipe.tasksVision (UMD 模式)
-                const vision = await mediapipe.tasksVision.FilesetResolver.forVisionTasks(
+                // 使用 MediaPipe 官方 UMD 全域變數
+                const vision = await tasksVision.FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
                 );
                 
-                handLandmarker = await mediapipe.tasksVision.HandLandmarker.createFromOptions(vision, {
+                handLandmarker = await tasksVision.HandLandmarker.createFromOptions(vision, {
                     baseOptions: {
                         modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
                         delegate: "GPU"
@@ -84,34 +79,31 @@
                     numHands: 2
                 });
                 
-                console.log("AI Ready");
+                console.log("AI 模型加載成功");
                 startCamera();
             } catch (err) {
-                console.error(err);
-                document.getElementById('loading-text').innerHTML = `<span class="text-red-500">載入失敗: ${err.message}</span>`;
+                console.error("AI 初始化失敗:", err);
+                document.getElementById('loading-text').innerHTML = `<span class="text-red-500 font-bold">加載失敗: ${err.message}</span><br><small>請確認使用 HTTPS 或 localhost</small>`;
             }
         }
 
         async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+                const constraints = { video: { width: 1280, height: 720 } };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 video.onloadeddata = () => {
                     loadingOverlay.classList.add('hidden');
                     render();
                 };
             } catch (err) {
-                alert("無法存取攝影機，請確保已開啟權限且網址為 HTTPS");
+                document.getElementById('loading-text').innerText = "找不到攝影機或權限被拒絕";
             }
         }
 
+        // --- 遊戲邏輯函數 ---
         function generatePuzzle() {
-            let tiles = [];
-            for (let y = 0; y < ROWS; y++) {
-                for (let x = 0; x < COLS; x++) {
-                    tiles.push({ id: y * COLS + x, origX: x, origY: y });
-                }
-            }
+            let tiles = Array.from({length: ROWS * COLS}, (_, i) => ({ id: i, origX: i % COLS, origY: Math.floor(i / COLS) }));
             return tiles.sort(() => Math.random() - 0.5);
         }
 
@@ -120,44 +112,32 @@
                 lastVideoTime = video.currentTime;
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
-
                 const results = handLandmarker.detectForVideo(video, performance.now());
                 
                 ctx.save();
-                ctx.translate(canvas.width, 0);
-                ctx.scale(-1, 1);
+                ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 ctx.restore();
 
-                if (gameState === 'SCANNING') {
-                    handleScanning(results);
-                } else if (gameState === 'PLAYING') {
-                    handlePlaying(results);
-                }
+                if (gameState === 'SCANNING') handleScanning(results);
+                else if (gameState === 'PLAYING') handlePlaying(results);
             }
             requestAnimationFrame(render);
         }
 
         function handleScanning(results) {
-            document.getElementById('instruction-scanning').classList.remove('hidden');
-            document.getElementById('instruction-playing').classList.add('hidden');
-            document.getElementById('timer-display').classList.add('hidden');
-
             if (results.landmarks && results.landmarks.length === 2) {
                 const h1 = results.landmarks[0], h2 = results.landmarks[1];
                 const d1 = Math.hypot(h1[8].x - h1[4].x, h1[8].y - h1[4].y);
                 const d2 = Math.hypot(h2[8].x - h2[4].x, h2[8].y - h2[4].y);
-
+                
                 if (d1 > FRAME_THRESHOLD && d2 > FRAME_THRESHOLD) {
                     const allX = [h1[8].x, h1[4].x, h2[8].x, h2[4].x];
                     const allY = [h1[8].y, h1[4].y, h2[8].y, h2[4].y];
                     lastFrameCoords = { minX: Math.min(...allX), maxX: Math.max(...allX), minY: Math.min(...allY), maxY: Math.max(...allY) };
-                    
-                    ctx.strokeStyle = '#ccff00';
-                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = '#ccff00'; ctx.lineWidth = 4;
                     ctx.strokeRect((1-lastFrameCoords.maxX)*canvas.width, lastFrameCoords.minY*canvas.height, (lastFrameCoords.maxX-lastFrameCoords.minX)*canvas.width, (lastFrameCoords.maxY-lastFrameCoords.minY)*canvas.height);
                 }
-
                 if (d1 < PINCH_THRESHOLD && d2 < PINCH_THRESHOLD && lastFrameCoords) {
                     captureAndStart();
                 }
@@ -166,8 +146,7 @@
 
         function captureAndStart() {
             const c = lastFrameCoords;
-            const sw = (c.maxX - c.minX) * canvas.width;
-            const sh = (c.maxY - c.minY) * canvas.height;
+            const sw = (c.maxX - c.minX) * canvas.width, sh = (c.maxY - c.minY) * canvas.height;
             puzzleImageCanvas = document.createElement('canvas');
             puzzleImageCanvas.width = sw; puzzleImageCanvas.height = sh;
             const pCtx = puzzleImageCanvas.getContext('2d');
@@ -176,15 +155,11 @@
             puzzleTiles = generatePuzzle();
             gameBoardCoords = { ...c };
             gameState = 'PLAYING';
-            startTime = Date.now();
-            document.getElementById('timer-display').classList.remove('hidden');
+            document.getElementById('instruction-scanning').classList.add('hidden');
+            document.getElementById('instruction-playing').classList.remove('hidden');
         }
 
         function handlePlaying(results) {
-            document.getElementById('instruction-scanning').classList.add('hidden');
-            document.getElementById('instruction-playing').classList.remove('hidden');
-            document.getElementById('time-text').innerText = ((Date.now() - startTime)/1000).toFixed(1) + "s";
-
             const c = gameBoardCoords;
             const bx = (1-c.maxX)*canvas.width, by = c.minY*canvas.height, bw = (c.maxX-c.minX)*canvas.width, bh = (c.maxY-c.minY)*canvas.height;
             let hoverIndex = null, isPinching = false;
@@ -205,19 +180,10 @@
                 } else if (dragInfo.isDragging) {
                     if (hoverIndex !== null && hoverIndex !== dragInfo.tileIndex) {
                         [puzzleTiles[dragInfo.tileIndex], puzzleTiles[hoverIndex]] = [puzzleTiles[hoverIndex], puzzleTiles[dragInfo.tileIndex]];
-                        if (puzzleTiles.every((t, i) => t.id === i)) {
-                            alert("完成！"); gameState = 'SCANNING';
-                        }
+                        if (puzzleTiles.every((t, i) => t.id === i)) { alert("拼圖完成！"); gameState = 'SCANNING'; }
                     }
                     dragInfo = { isDragging: false, tileIndex: null };
                 }
-
-                // 握拳重置
-                const isFist = [8,12,16,20].every(i => Math.hypot(hand[i].x - hand[0].x, hand[i].y - hand[0].y) < 0.12);
-                if (isFist) {
-                    if (!fistHoldStart) fistHoldStart = Date.now();
-                    if (Date.now() - fistHoldStart > RESET_DWELL_MS) { gameState = 'SCANNING'; fistHoldStart = null; }
-                } else { fistHoldStart = null; }
             }
             drawPuzzleBoard(bx, by, bw, bh, hoverIndex);
             ctx.beginPath(); ctx.arc(smoothCursor.x, smoothCursor.y, 10, 0, Math.PI*2);
@@ -235,12 +201,13 @@
             });
             if (dragInfo.isDragging) {
                 const tile = puzzleTiles[dragInfo.tileIndex];
-                ctx.globalAlpha = 0.7;
+                ctx.globalAlpha = 0.6;
                 ctx.drawImage(puzzleImageCanvas, tile.origX * sw, tile.origY * sh, sw, sh, smoothCursor.x - tw/2, smoothCursor.y - th/2, tw, th);
                 ctx.globalAlpha = 1.0;
             }
         }
 
+        // 啟動
         window.onload = initAI;
     </script>
 </body>
