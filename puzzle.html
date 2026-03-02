@@ -465,7 +465,7 @@
                     <p class="font-bold text-[#ccff00] mb-2">PHASE 2：拼圖</p>
                     <p>1. 捏住食指＋拇指 → 拿起</p>
                     <p>2. 拖到目標位置放開</p>
-                    <p class="text-[#ccff00] mt-3">握拳 1.5 秒 → 重置</p>
+                    <p class="text-[#ccff00] mt-3">雙手握拳 1.5 秒 → 重置</p>
                 `;
             } 
             else if (gameState === 'SOLVED') {
@@ -712,24 +712,33 @@
                     }
                 }
 
-                // fist reset
-                let isFist = false;
-                if (interactingHand && gameState === 'PLAYING') {
-                    const wrist = interactingHand[0];
-                    const tips = [8,12,16,20];
-                    const pips = [6,10,14,18];
-                    let closed = 0;
-                    for (let i = 0; i < 4; i++) {
-                        const tip = interactingHand[tips[i]];
-                        const pip = interactingHand[pips[i]];
-                        const dTip = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
-                        const dPip = Math.hypot(pip.x - wrist.x, pip.y - wrist.y);
-                        if (dTip < dPip) closed++;
+                // ====================== DOUBLE FIST RESET (修改重點) ======================
+                let isBothFists = false;
+
+                if (results && results.landmarks && results.landmarks.length >= 2 && gameState === 'PLAYING') {
+                    let fistCount = 0;
+                    
+                    for (const hand of results.landmarks) {
+                        const wrist = hand[0];
+                        const tips = [8,12,16,20];
+                        const pips = [6,10,14,18];
+                        let closed = 0;
+                        
+                        for (let i = 0; i < 4; i++) {
+                            const tip = hand[tips[i]];
+                            const pip = hand[pips[i]];
+                            const dTip = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+                            const dPip = Math.hypot(pip.x - wrist.x, pip.y - wrist.y);
+                            if (dTip < dPip) closed++;
+                        }
+                        
+                        if (closed === 4) fistCount++;
                     }
-                    isFist = closed === 4;
+                    
+                    isBothFists = (fistCount === 2);
                 }
 
-                if (isFist) {
+                if (isBothFists) {
                     if (!fistHoldStart) fistHoldStart = performance.now();
                     const elapsed = performance.now() - fistHoldStart;
                     const prog = Math.min(elapsed / RESET_DWELL_MS, 1);
@@ -755,7 +764,7 @@
                     ctx.font = 'bold 16px JetBrains Mono';
                     ctx.fillText('重置中...', cx, cy - 8);
                     ctx.font = '12px JetBrains Mono';
-                    ctx.fillText('握拳保持', cx, cy + 18);
+                    ctx.fillText('雙手握拳保持', cx, cy + 18);
                     ctx.restore();
 
                     if (elapsed > RESET_DWELL_MS) {
