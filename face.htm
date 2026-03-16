@@ -226,9 +226,19 @@
             
             registerBtn.disabled = false;
 
-            setInterval(async () => {
-                const detections = await faceapi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
+            // 定義一個非同步的「接力賽」函數，取代原本的 setInterval
+            async function detectLoop() {
+                // 如果影片暫停或結束了，就停止偵測
+                if (video.paused || video.ended) return; 
+
+                // 🚀 優化秘訣 1：設定 inputSize
+                // 預設是 416，改成 224 甚至 160 可以大幅降低電腦負擔，速度快好幾倍！
+                const options = new faceapi.SsdMobilenetv1Options({ inputSize: 224, minConfidence: 0.5 });
+                
+                // 執行辨識 (套用剛設定好的 options)
+                const detections = await faceapi.detectAllFaces(video, options).withFaceLandmarks().withFaceDescriptors();
                 const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                
                 canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
 
                 if (faceMatcher) {
@@ -237,17 +247,22 @@
                         const box = resizedDetections[i].detection.box;
                         const { label, distance } = result;
                         
-                        // 已知人臉為綠色，未知(unknown)為紅色
                         const boxColor = label === 'unknown' ? 'rgba(255, 0, 0, 0.8)' : 'rgba(0, 255, 0, 0.8)';
-                        
                         const drawBox = new faceapi.draw.DrawBox(box, { label: `${label} (${Math.round(distance*100)/100})`, boxColor: boxColor });
                         drawBox.draw(canvas);
                     });
                 } else {
-                    // 如果沒有任何資料，只畫框框
                     faceapi.draw.drawDetections(canvas, resizedDetections);
                 }
-            }, 100);
+
+                // 🚀 優化秘訣 2：遞迴呼叫 (Recursive Call)
+                // 等到上面的運算跟畫圖都「確實完成」了，我們才休息 100 毫秒，然後呼叫自己進行下一回合。
+                // 這樣絕對不會發生「塞車」導致畫面卡死的問題！
+                setTimeout(detectLoop, 100); 
+            }
+
+            // 呼叫函數，啟動第一次偵測
+            detectLoop();
         });
     </script>
 </body>
