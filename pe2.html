@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 專業深蹲教練 (完整功能版)</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+    <style>
+        :root {
+            --primary-orange: #f39c12;
+            --danger-red: #e74c3c;
+            --success-green: #2ecc71;
+            --dark-bg: #2c3e50;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--dark-bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            color: white;
+        }
+
+        h1 { margin-bottom: 15px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+
+        .container {
+            position: relative;
+            width: 640px;
+            height: 480px;
+            background-color: #000;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            border: 4px solid #34495e;
+        }
+
+        #input_video { display: none; }
+        /* 畫布鏡像顯示，讓動作更直觀 */
+        #output_canvas { 
+            width: 100%; 
+            height: 100%; 
+            transform: scaleX(-1); 
+        }
+
+        /* 計分板 (HUD) */
+        .scoreboard {
+            position: absolute;
+            top: 0; left: 0;
+            background-color: rgba(243, 156, 18, 0.9);
+            padding: 15px 25px;
+            border-bottom-right-radius: 20px;
+            display: flex;
+            gap: 30px;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+        }
+
+        .score-item { display: flex; flex-direction: column; }
+        .label { font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+        .value { font-size: 36px; font-weight: 900; }
+
+        /* 警告訊息 */
+        #warning-msg {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(231, 76, 60, 0.9);
+            color: white;
+            padding: 30px 50px;
+            border-radius: 15px;
+            font-size: 32px;
+            font-weight: bold;
+            display: none;
+            z-index: 20;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(231, 76, 60, 0.5);
+        }
+
+        /* +1 特效 */
+        #plus-one-effect {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 150px;
+            font-weight: 900;
+            color: #f1c40f;
+            text-shadow: 0 0 20px rgba(0,0,0,0.5);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        @keyframes popUpFade {
+            0% { opacity: 0; transform: translate(-50%, -20%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -80%) scale(1); }
+        }
+
+        .trigger-plus-one { animation: popUpFade 0.8s ease-out forwards; }
+
+        /* 下方控制欄 */
+        .controls-bar {
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px 20px;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            z-index: 10;
+        }
+
+        .slider-group { display: flex; align-items: center; gap: 10px; flex-grow: 1; }
+        input[type=range] { flex-grow: 1; cursor: pointer; accent-color: var(--primary-orange); }
+        
+        /* 重設按鈕樣式 */
+        .btn-reset {
+            background-color: var(--danger-red);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-reset:hover { background-color: #c0392b; transform: scale(1.05); }
+        .btn-reset:active { transform: scale(0.95); }
+
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 20px; }
+    </style>
+</head>
+<body>
+
+    <h1>🏋️‍♂️ AI 專業深蹲教練</h1>
+
+    <div class="container">
+        <div id="loading">正在啟動 AI 視覺模型...</div>
+        
+        <div id="plus-one-effect">+1</div>
+        <div id="warning-msg">⚠️ 請張開雙手<br><span style="font-size:18px">手臂需離開身體兩側</span></div>
+
+        <div class="scoreboard">
+            <div class="score-item">
+                <span class="label">Reps 次數</span>
+                <span id="reps-display" class="value">0</span>
+            </div>
+            <div class="score-item">
+                <span class="label">Stage 狀態</span>
+                <span id="stage-display" class="value">STAND</span>
+            </div>
+        </div>
+
+        <div class="controls-bar">
+            <div class="slider-group">
+                <span class="label">下蹲難度:</span>
+                <input type="range" id="angle-slider" min="60" max="130" value="90" step="5">
+                <span id="angle-val" style="color:var(--primary-orange); font-weight:bold; width:40px;">90°</span>
+            </div>
+            
+            <button class="btn-reset" id="reset-btn">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                    <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                </svg>
+                重設次數
+            </button>
+        </div>
+
+        <video id="input_video"></video>
+        <canvas id="output_canvas" width="640" height="480"></canvas>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const repsDisplay = document.getElementById('reps-display');
+        const stageDisplay = document.getElementById('stage-display');
+        const warningMsg = document.getElementById('warning-msg');
+        const plusOneElem = document.getElementById('plus-one-effect');
+        const angleSlider = document.getElementById('angle-slider');
+        const angleValDisplay = document.getElementById('angle-val');
+        const resetBtn = document.getElementById('reset-btn');
+        const loadingMsg = document.getElementById('loading');
+
+        let count = 0;
+        let stage = 'UP'; // 狀態：UP(站立), DOWN(已下蹲)
+        let targetAngle = 90;
+
+        // 滑桿事件
+        angleSlider.addEventListener('input', (e) => {
+            targetAngle = e.target.value;
+            angleValDisplay.innerText = targetAngle + "°";
+        });
+
+        // 重設按鈕事件
+        resetBtn.addEventListener('click', () => {
+            count = 0;
+            stage = 'UP';
+            repsDisplay.innerText = count;
+            stageDisplay.innerText = stage;
+            stageDisplay.style.color = "white";
+        });
+
+        // 動畫結束監聽
+        plusOneElem.addEventListener('animationend', () => {
+            plusOneElem.classList.remove('trigger-plus-one');
+        });
+
+        // 角度計算函數
+        function calculateAngle(a, b, c) {
+            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            if (angle > 180.0) angle = 360 - angle;
+            return angle;
+        }
+
+        function onResults(results) {
+            loadingMsg.style.display = 'none';
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            if (results.poseLandmarks) {
+                const landmarks = results.poseLandmarks;
+
+                // 取得關鍵點
+                const lHip = landmarks[23]; const lKnee = landmarks[25]; const lAnkle = landmarks[27];
+                const rHip = landmarks[24]; const rKnee = landmarks[26]; const rAnkle = landmarks[28];
+                const lShoulder = landmarks[11]; const lElbow = landmarks[13];
+                const rShoulder = landmarks[12]; const rElbow = landmarks[14];
+
+                // 檢查可見度
+                const visThresh = 0.5;
+                const isVisible = lHip.visibility > visThresh && lKnee.visibility > visThresh && rHip.visibility > visThresh && rKnee.visibility > visThresh;
+
+                if (isVisible) {
+                    const angleL = calculateAngle(lHip, lKnee, lAnkle);
+                    const angleR = calculateAngle(rHip, rKnee, rAnkle);
+                    const armL = calculateAngle(lElbow, lShoulder, lHip);
+                    const armR = calculateAngle(rElbow, rShoulder, rHip);
+
+                    // 1. 手臂平舉判定 (40度寬容版)
+                    const handsUp = (armL > 40 && armR > 40);
+
+                    if (!handsUp) {
+                        warningMsg.style.display = "block";
+                        drawConnectors(canvasCtx, landmarks, POSE_CONNECTIONS, {color: '#95a5a6', lineWidth: 2});
+                    } else {
+                        warningMsg.style.display = "none";
+
+                        // 2. 深蹲邏輯 (站立 -> 下蹲 -> 站起才算一次)
+                        
+                        // 判定下蹲
+                        if (angleL < targetAngle && angleR < targetAngle) {
+                            if (stage === 'UP') {
+                                stage = 'DOWN';
+                                stageDisplay.innerText = "DOWN";
+                                stageDisplay.style.color = "#2ecc71"; // 變綠色提示深度達標
+                            }
+                        }
+
+                        // 判定站起完成
+                        if (angleL > 160 && angleR > 160) {
+                            if (stage === 'DOWN') {
+                                count++;
+                                repsDisplay.innerText = count;
+                                stage = 'UP';
+                                stageDisplay.innerText = "UP";
+                                stageDisplay.style.color = "white";
+                                
+                                // 觸發 +1 特效
+                                plusOneElem.classList.add('trigger-plus-one');
+                            }
+                        }
+
+                        // 3. 繪製骨架 (根據是否達標變色)
+                        let statusColor = (angleL < targetAngle && angleR < targetAngle) ? '#2ecc71' : '#f39c12';
+                        
+                        drawConnectors(canvasCtx, landmarks, POSE_CONNECTIONS, {color: statusColor, lineWidth: 4});
+                        drawLandmarks(canvasCtx, landmarks, {color: statusColor, lineWidth: 2, radius: 4});
+                    }
+                }
+            }
+            canvasCtx.restore();
+        }
+
+        // 初始化 Pose 模型
+        const pose = new Pose({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+        }});
+
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6
+        });
+
+        pose.onResults(onResults);
+
+        // 初始化相機
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await pose.send({image: videoElement});
+            },
+            width: 640,
+            height: 480
+        });
+        camera.start();
+    </script>
+</body>
+</html>
