@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>牧童笛音樂節奏練習</title>
+    <title>直笛音樂節奏練習</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* 隱藏元素的通用類別 */
@@ -26,7 +26,7 @@
         <!-- 標題列 -->
         <div class="bg-slate-900 p-4 border-b border-slate-700 flex items-center gap-3">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-teal-400"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
-            <h1 class="text-xl font-bold tracking-wider">牧童笛音樂節奏練習</h1>
+            <h1 class="text-xl font-bold tracking-wider">直笛音樂節奏練習</h1>
         </div>
 
         <!-- === 狀態 1: 初始/設定 === -->
@@ -34,7 +34,7 @@
             <div class="w-24 h-24 bg-teal-500/20 rounded-full flex items-center justify-center mb-6">
                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-teal-400"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg>
             </div>
-            <h2 class="text-2xl font-bold mb-4">準備好你的牧童笛了嗎？</h2>
+            <h2 class="text-2xl font-bold mb-4">準備好你的直笛了嗎？</h2>
             <p class="text-slate-400 mb-8 max-w-md leading-relaxed">
                 這是一個結合麥克風收音的節奏遊戲。<br/>
                 請允許瀏覽器使用麥克風，對著麥克風吹奏對應的音符來得分！
@@ -55,6 +55,21 @@
                         <!-- 選項由 JS 動態產生 -->
                     </select>
                 </div>
+                
+                <!-- 新增：播放速度拉桿區塊 -->
+                <div class="flex flex-col gap-2 mt-4">
+                    <div class="flex justify-between items-center">
+                        <label class="text-sm text-slate-400 font-medium">2. 選擇播放速度</label>
+                        <span id="speed-display" class="text-sm font-bold text-teal-400 bg-slate-900 px-2 py-1 rounded">x1.0</span>
+                    </div>
+                    <input type="range" id="speed-slider" min="0.5" max="2.0" step="0.1" value="1.0" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-teal-500">
+                    <div class="flex justify-between text-xs text-slate-500 px-1">
+                        <span>慢速 (0.5x)</span>
+                        <span>正常</span>
+                        <span>快速 (2.0x)</span>
+                    </div>
+                </div>
+
                 <div class="pt-6">
                     <button id="btn-start-game" class="w-full bg-teal-500 hover:bg-teal-400 text-white px-6 py-4 rounded-xl font-bold text-xl transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2 shadow-lg shadow-teal-500/30">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
@@ -79,8 +94,16 @@
             <!-- 右側控制與顯示區 -->
             <div class="w-[140px] bg-slate-800 p-4 flex flex-col items-center shrink-0">
                 <h3 class="text-slate-400 text-sm mb-2 text-center">正在吹奏音調</h3>
-                <div id="pitch-display" class="text-4xl font-black text-slate-600 mb-6 h-16 flex items-center justify-center bg-slate-900 w-full rounded-lg border border-slate-700 shadow-inner">
+                <div id="pitch-display" class="text-4xl font-black text-slate-600 mb-4 h-16 flex items-center justify-center bg-slate-900 w-full rounded-lg border border-slate-700 shadow-inner">
                     --
+                </div>
+
+                <!-- 新增：遊戲內的播放速度拉桿 -->
+                <h3 class="text-slate-400 text-xs mb-1 text-center">更改播放速度</h3>
+                <div class="flex flex-col items-center mb-4 w-full bg-slate-900/50 p-2 rounded-lg border border-slate-700">
+                    <span id="game-speed-display" class="text-sm font-bold text-teal-400 mb-1">x1.0</span>
+                    <input type="range" id="game-speed-slider" min="0.5" max="2.0" step="0.1" value="1.0" class="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-teal-500">
+                    <span class="text-[10px] text-slate-500 mt-1">選段落後生效</span>
                 </div>
 
                 <h3 class="text-slate-400 text-sm mb-3">段落跳轉練習</h3>
@@ -121,7 +144,7 @@
     <!-- 操作提示小工具 -->
     <div class="fixed bottom-4 right-4 bg-slate-800/80 backdrop-blur-sm border border-slate-700 p-4 rounded-xl text-xs text-slate-400 flex items-start gap-2 max-w-xs pointer-events-none">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400 shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
-        <p>請盡量在安靜的環境下遊玩，以確保麥克風能準確捕捉到牧童笛的頻率。音符對應標準牧童笛音高 (C5-D6)。</p>
+        <p>請盡量在安靜的環境下遊玩，以確保麥克風能準確捕捉到直笛的頻率。音符對應標準直笛音高 (C5-D6)。</p>
     </div>
 
     <!-- 遊戲邏輯腳本 -->
@@ -140,30 +163,6 @@
         };
 
         const SONGS = [
-            {
-                id: 'monkey',
-                title: '小猴跳舞',
-                phrases: [
-                    {
-                        id: 'p1',
-                        name: '第一句 (E D E - E D E - E D E D E D C)',
-                        notes: [
-                            { pitch: 'E5', time: 0 }, { pitch: 'D5', time: 1000 }, { pitch: 'E5', time: 2000 },
-                            { pitch: 'E5', time: 4000 }, { pitch: 'D5', time: 5000 }, { pitch: 'E5', time: 6000 }, 
-							{ pitch: 'E5', time: 8000 }, { pitch: 'D5', time: 9000 }, { pitch: 'E5', time: 10000 }, { pitch: 'D5', time: 11000 }, { pitch: 'E5', time: 12000 }, { pitch: 'D5', time: 13000 }, { pitch: 'C5', time: 14000 }
-                        ]
-                    },
-                    {
-                        id: 'p2',
-                        name: '第二句 (E D E - E D E - E D E D C D C)',
-                        notes: [
-                            { pitch: 'E5', time: 16000 }, { pitch: 'D5', time: 17000 }, { pitch: 'E5', time: 18000 },
-                            { pitch: 'E5', time: 20000 }, { pitch: 'D5', time: 21000 }, { pitch: 'E5', time: 22000 }, 
-							{ pitch: 'E5', time: 24000 }, { pitch: 'D5', time: 25000 }, { pitch: 'E5', time: 26000 }, { pitch: 'D5', time: 27000 }, { pitch: 'C5', time: 28000 }, { pitch: 'D5', time: 29000 }, { pitch: 'C5', time: 30000 }
-                        ]
-                    }
-                ]
-            },
             {
                 id: 'mary',
                 title: '瑪莉有隻小綿羊',
@@ -287,6 +286,8 @@
         
         let selectedSong = SONGS[0].id;
         let targetPhrase = null;
+        let speedMultiplier = 1.0; // 實際執行中的播放速度
+        let pendingSpeedMultiplier = 1.0; // 新增：拉桿暫存的播放速度 (待下一次播放生效)
         
         const gameState = {
             startTime: 0,
@@ -314,6 +315,12 @@
         const phraseButtonsContainer = document.getElementById('phrase-buttons-container');
         const selectSongEl = document.getElementById('select-song');
         const countdownTextEl = document.getElementById('countdown-text');
+        
+        // 新增：拉桿與顯示的 DOM 元素引用
+        const speedSliderEl = document.getElementById('speed-slider');
+        const speedDisplayEl = document.getElementById('speed-display');
+        const gameSpeedSliderEl = document.getElementById('game-speed-slider');
+        const gameSpeedDisplayEl = document.getElementById('game-speed-display');
 
         // === 初始化與事件綁定 ===
         function init() {
@@ -334,6 +341,27 @@
             selectSongEl.addEventListener('change', (e) => {
                 selectedSong = e.target.value;
                 renderPhraseButtons();
+            });
+
+            // 選單畫面的播放速度拉桿事件 (可立即套用)
+            speedSliderEl.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                pendingSpeedMultiplier = val;
+                speedMultiplier = val;
+                speedDisplayEl.textContent = `x${val.toFixed(1)}`;
+                // 同步更新遊戲內的拉桿
+                gameSpeedSliderEl.value = val;
+                gameSpeedDisplayEl.textContent = `x${val.toFixed(1)}`;
+            });
+
+            // 遊戲畫面的播放速度拉桿事件 (僅暫存，不立即改變 speedMultiplier)
+            gameSpeedSliderEl.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                pendingSpeedMultiplier = val;
+                gameSpeedDisplayEl.textContent = `x${val.toFixed(1)}`;
+                // 同步更新選單內的拉桿
+                speedSliderEl.value = val;
+                speedDisplayEl.textContent = `x${val.toFixed(1)}`;
             });
         }
 
@@ -381,6 +409,10 @@
         function handleStartGame(phraseId = null) {
             targetPhrase = phraseId;
             gameState.isPlaying = false;
+            
+            // 重要：只有在重新開始/選擇段落時，才將暫存的速度套用到實際遊戲中
+            speedMultiplier = pendingSpeedMultiplier;
+            
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             if (countdownTimerId) clearInterval(countdownTimerId);
             
@@ -469,7 +501,9 @@
             if (!gameState.isPlaying) return;
 
             const now = performance.now();
-            const elapsedTime = now - gameState.startTime;
+            
+            // 修改：將真實流逝的時間乘上播放速度，達成歌曲加速或減速的效果
+            const elapsedTime = (now - gameState.startTime) * speedMultiplier;
             
             // 1. 音高偵測
             if (analyser) {
