@@ -83,10 +83,90 @@
         <div class="bg-black/60 p-4 rounded-xl backdrop-blur-md border border-gray-700 interactive shadow-xl">
             <label for="instrumentSelect" class="text-white font-bold mr-2">選擇樂器音色：</label>
             <select id="instrumentSelect" class="bg-gray-800 text-white border border-gray-600 rounded p-2 focus:outline-none focus:border-blue-400">
-                <option value="piano">鋼琴 (Piano)</option>
-                <option value="plucked">撥弦樂器 (吉他/豎琴)</option>
-                <option value="bowed">弓弦樂器 (小提琴/大提琴)</option>
-                <option value="symphonic">交響弦樂庫 (Symphonic Strings)</option>
+                <optgroup label="鋼琴 (Piano)">
+                    <option value="1">1. 原聲鋼琴</option>
+                    <option value="2">2. 明亮鋼琴</option>
+                    <option value="3">3. 電鋼琴</option>
+                    <option value="4">4. 酒吧鋼琴</option>
+                </optgroup>
+                <optgroup label="鍵盤樂器 (Chromatic Percussion)">
+                    <option value="5">5. 電鋼琴</option>
+                    <option value="6">6. 柔和電鋼琴</option>
+                    <option value="9">9. 木琴</option>
+                    <option value="10">10. 鐘琴</option>
+                </optgroup>
+                <optgroup label="風琴 (Organ)">
+                    <option value="17">17. 抽屜風琴</option>
+                    <option value="18">18. 打擊樂風琴</option>
+                    <option value="19">19. 搖滾風琴</option>
+                    <option value="20">20. 教堂風琴</option>
+                </optgroup>
+                <optgroup label="吉他 (Guitar)">
+                    <option value="25">25. 鋼弦吉他</option>
+                    <option value="26">26. 電吉他(爵士)</option>
+                    <option value="27">27. 電吉他(乾聲)</option>
+                    <option value="28">28. 電吉他(悶音)</option>
+                </optgroup>
+                <optgroup label="貝斯 (Bass)">
+                    <option value="33">33. 原聲貝斯</option>
+                    <option value="34">34. 電貝斯(指彈)</option>
+                    <option value="35">35. 電貝斯(撥片)</option>
+                    <option value="39">39. 合成貝斯</option>
+                </optgroup>
+                <optgroup label="弦樂/管弦樂 (Orchestral Strings)">
+                    <option value="41">41. 小提琴</option>
+                    <option value="42">42. 中提琴</option>
+                    <option value="43">43. 大提琴</option>
+                    <option value="45">45. 撥弦樂器</option>
+                </optgroup>
+                <optgroup label="合奏/合唱 (Ensemble)">
+                    <option value="49">49. 弦樂合奏1</option>
+                    <option value="50">50. 弦樂合奏2</option>
+                    <option value="53">53. 合唱「啊」</option>
+                    <option value="55">55. 管弦樂合奏</option>
+                </optgroup>
+                <optgroup label="銅管樂器 (Brass)">
+                    <option value="57">57. 小號</option>
+                    <option value="58">58. 長號</option>
+                    <option value="59">59. 大號</option>
+                    <option value="60">60. 法國號</option>
+                </optgroup>
+                <optgroup label="簧樂器 (Reed)">
+                    <option value="65">65. 高音薩克斯風</option>
+                    <option value="66">66. 中音薩克斯風</option>
+                    <option value="69">69. 雙簧管</option>
+                    <option value="70">70. 低音管</option>
+                </optgroup>
+                <optgroup label="管樂器 (Pipe)">
+                    <option value="73">73. 長笛</option>
+                    <option value="74">74. 直笛</option>
+                    <option value="75">75. 排笛</option>
+                    <option value="76">76. 瓶笛</option>
+                </optgroup>
+                <optgroup label="合成主音 (Synth Lead)">
+                    <option value="81">81. 方波</option>
+                    <option value="82">82. 鋸齒波</option>
+                    <option value="85">85. 呼喚</option>
+                    <option value="88">88. 貝斯+主音</option>
+                </optgroup>
+                <optgroup label="合成柔音 (Synth Pad)">
+                    <option value="89">89. 幻想</option>
+                    <option value="90">90. 溫暖</option>
+                    <option value="91">91. 複雜</option>
+                    <option value="94">94. 廣闊</option>
+                </optgroup>
+                <optgroup label="合成特殊效果 (Synth Effects)">
+                    <option value="97">97. 雨</option>
+                    <option value="98">98. 音軌</option>
+                    <option value="100">100. 氛圍</option>
+                    <option value="104">104. 驚悚</option>
+                </optgroup>
+                <optgroup label="民族樂器 (Ethnic)">
+                    <option value="105">105. 西塔琴</option>
+                    <option value="106">106. 班鳩琴</option>
+                    <option value="109">109. 風笛</option>
+                    <option value="110">110. 古箏</option>
+                </optgroup>
             </select>
         </div>
         <div class="bg-black/60 p-4 rounded-xl backdrop-blur-md border border-gray-700 text-white font-mono text-xl">
@@ -119,7 +199,7 @@
             { name: "m", intervals: [0, 3, 7], suffix: "m" },         // 小調
             { name: "maj7", intervals: [-1, 0, 4, 7], suffix: "maj7" },// 大七
             { name: "m7", intervals: [-2, 0, 3, 7], suffix: "m7" },   // 小七
-            { name: "7", intervals: [-2, 0, 4, 7], suffix: "7" },     // 屬七
+            { name: "7", intervals: [-2, 0, 4, 7], suffix: "7" },     // 屬七 (第三轉位寫法)
             { name: "dim", intervals: [0, 3, 6], suffix: "dim" },     // 減和弦
             { name: "aug", intervals: [0, 4, 8], suffix: "aug" },     // 增和弦
             { name: "sus4", intervals: [0, 5, 7], suffix: "sus4" }    // 掛留四
@@ -131,61 +211,132 @@
             let baseOctave = 4; // 預設第 4 個八度
             return qualityIntervals.map(interval => {
                 let totalIndex = baseIndex + interval;
-                let noteName = noteNames[totalIndex % 12];
+                // 修正 JavaScript 中負數取餘數 (modulo) 的問題，確保向下跨八度時陣列索引正確
+                let noteName = noteNames[(totalIndex % 12 + 12) % 12];
                 let octave = baseOctave + Math.floor(totalIndex / 12);
                 return noteName + octave;
             });
         }
 
+        // --- 新增：56種樂器的合成器參數預設庫 (模擬 MIDI 樂器特性) ---
+        const instrumentPresets = {
+            // Piano
+            "1": { osc: "triangle", env: {a: 0.02, d: 0.3, s: 0.4, r: 1.5}, filter: 2000 },
+            "2": { osc: "sawtooth", env: {a: 0.01, d: 0.2, s: 0.5, r: 1.2}, filter: 4000 },
+            "3": { osc: "fmsine", env: {a: 0.01, d: 0.4, s: 0.3, r: 1.5}, filter: 1500 },
+            "4": { osc: "fmsquare", env: {a: 0.01, d: 0.1, s: 0.2, r: 1.0}, filter: 1800 },
+            // Chromatic Percussion
+            "5": { osc: "sine", env: {a: 0.01, d: 0.4, s: 0.2, r: 1.0}, filter: 1000 },
+            "6": { osc: "triangle", env: {a: 0.05, d: 0.5, s: 0.3, r: 1.5}, filter: 800 },
+            "9": { osc: "sine", env: {a: 0.005, d: 0.2, s: 0.0, r: 0.2}, filter: 3000 }, // 木琴
+            "10": { osc: "fmsine", env: {a: 0.001, d: 0.5, s: 0.0, r: 1.0}, filter: 4000 }, // 鐘琴
+            // Organ
+            "17": { osc: "fatsine", env: {a: 0.01, d: 0.1, s: 1.0, r: 0.1}, filter: 2500 },
+            "18": { osc: "square", env: {a: 0.01, d: 0.2, s: 0.8, r: 0.1}, filter: 3000 },
+            "19": { osc: "fatsawtooth", env: {a: 0.01, d: 0.1, s: 1.0, r: 0.2}, filter: 4000 },
+            "20": { osc: "fatsquare", env: {a: 0.1, d: 0.1, s: 1.0, r: 0.5}, filter: 2000 },
+            // Guitar
+            "25": { osc: "triangle", env: {a: 0.01, d: 0.5, s: 0.1, r: 0.5}, filter: 1500 },
+            "26": { osc: "sine", env: {a: 0.01, d: 0.4, s: 0.2, r: 0.5}, filter: 1000 },
+            "27": { osc: "square", env: {a: 0.01, d: 0.3, s: 0.1, r: 0.3}, filter: 2500 },
+            "28": { osc: "triangle", env: {a: 0.01, d: 0.1, s: 0.0, r: 0.1}, filter: 800 }, // 悶音
+            // Bass
+            "33": { osc: "triangle", env: {a: 0.02, d: 0.3, s: 0.2, r: 0.4}, filter: 500 },
+            "34": { osc: "sine", env: {a: 0.01, d: 0.3, s: 0.5, r: 0.3}, filter: 600 },
+            "35": { osc: "square", env: {a: 0.01, d: 0.2, s: 0.3, r: 0.2}, filter: 1200 },
+            "39": { osc: "fatsawtooth", env: {a: 0.01, d: 0.3, s: 0.8, r: 0.3}, filter: 800 },
+            // Strings
+            "41": { osc: "sawtooth", env: {a: 0.2, d: 0.2, s: 0.8, r: 1.0}, filter: 2000 },
+            "42": { osc: "sawtooth", env: {a: 0.3, d: 0.2, s: 0.8, r: 1.0}, filter: 1500 },
+            "43": { osc: "sawtooth", env: {a: 0.4, d: 0.2, s: 0.8, r: 1.2}, filter: 1000 },
+            "45": { osc: "triangle", env: {a: 0.01, d: 0.2, s: 0.0, r: 0.2}, filter: 1500 },
+            // Ensemble
+            "49": { osc: "fatsawtooth", env: {a: 0.4, d: 0.3, s: 0.9, r: 1.5}, filter: 2500 },
+            "50": { osc: "fatsawtooth", env: {a: 0.6, d: 0.3, s: 0.8, r: 2.0}, filter: 1800 },
+            "53": { osc: "fatsawtooth", env: {a: 0.8, d: 0.5, s: 1.0, r: 2.0}, filter: 900 },
+            "55": { osc: "fmsquare", env: {a: 0.01, d: 0.2, s: 0.5, r: 0.5}, filter: 3000 },
+            // Brass
+            "57": { osc: "square", env: {a: 0.05, d: 0.1, s: 0.9, r: 0.2}, filter: 3000 },
+            "58": { osc: "square", env: {a: 0.08, d: 0.1, s: 0.9, r: 0.3}, filter: 2000 },
+            "59": { osc: "triangle", env: {a: 0.1, d: 0.1, s: 0.9, r: 0.4}, filter: 800 },
+            "60": { osc: "sawtooth", env: {a: 0.2, d: 0.1, s: 0.8, r: 0.5}, filter: 1200 },
+            // Reed
+            "65": { osc: "square", env: {a: 0.1, d: 0.1, s: 0.9, r: 0.2}, filter: 2500 },
+            "66": { osc: "sawtooth", env: {a: 0.1, d: 0.1, s: 0.9, r: 0.2}, filter: 2000 },
+            "69": { osc: "square", env: {a: 0.1, d: 0.1, s: 0.9, r: 0.2}, filter: 1500 },
+            "70": { osc: "square", env: {a: 0.15, d: 0.1, s: 0.9, r: 0.3}, filter: 1000 },
+            // Pipe
+            "73": { osc: "sine", env: {a: 0.1, d: 0.1, s: 0.8, r: 0.5}, filter: 2000 },
+            "74": { osc: "triangle", env: {a: 0.05, d: 0.1, s: 0.8, r: 0.3}, filter: 2500 },
+            "75": { osc: "fmsine", env: {a: 0.1, d: 0.2, s: 0.7, r: 0.5}, filter: 1500 },
+            "76": { osc: "sine", env: {a: 0.1, d: 0.1, s: 0.5, r: 0.5}, filter: 800 },
+            // Synth Lead
+            "81": { osc: "square", env: {a: 0.01, d: 0.1, s: 1.0, r: 0.2}, filter: 3000 },
+            "82": { osc: "sawtooth", env: {a: 0.01, d: 0.1, s: 1.0, r: 0.2}, filter: 3000 },
+            "85": { osc: "fmsquare", env: {a: 0.05, d: 0.2, s: 0.8, r: 0.5}, filter: 2500 },
+            "88": { osc: "fatsawtooth", env: {a: 0.02, d: 0.2, s: 0.9, r: 0.3}, filter: 1500 },
+            // Synth Pad
+            "89": { osc: "fmsine", env: {a: 0.5, d: 0.5, s: 1.0, r: 2.0}, filter: 1500 },
+            "90": { osc: "fatsine", env: {a: 0.8, d: 0.5, s: 1.0, r: 3.0}, filter: 1200 },
+            "91": { osc: "fatsquare", env: {a: 0.6, d: 0.5, s: 0.8, r: 2.0}, filter: 1800 },
+            "94": { osc: "fatsawtooth", env: {a: 1.0, d: 0.5, s: 0.9, r: 3.0}, filter: 2000 },
+            // Synth Effects
+            "97": { osc: "fmsine", env: {a: 0.1, d: 0.5, s: 0.5, r: 1.0}, filter: 4000 }, 
+            "98": { osc: "fatsawtooth", env: {a: 1.0, d: 0.5, s: 1.0, r: 4.0}, filter: 1000 }, 
+            "100": { osc: "fmsine", env: {a: 1.5, d: 1.0, s: 1.0, r: 3.0}, filter: 1500 }, 
+            "104": { osc: "fmsquare", env: {a: 0.5, d: 0.5, s: 0.5, r: 2.0}, filter: 2500 }, 
+            // Ethnic
+            "105": { osc: "triangle", env: {a: 0.01, d: 1.0, s: 0.2, r: 1.0}, filter: 2500 },
+            "106": { osc: "square", env: {a: 0.01, d: 0.2, s: 0.0, r: 0.2}, filter: 2000 },
+            "109": { osc: "sawtooth", env: {a: 0.2, d: 0.1, s: 1.0, r: 0.5}, filter: 3000 },
+            "110": { osc: "triangle", env: {a: 0.02, d: 0.8, s: 0.1, r: 0.8}, filter: 1800 }
+        };
+
         let synth;
         let reverb;
         let masterVol;
+        let filter; // 新增濾波器
         let currentPlayingNotes = [];
         let currentChordNames = [];
 
         // 初始化合成器
-        function initAudio(type = 'piano') {
+        function initAudio(type = '1') {
             if (synth) {
                 synth.releaseAll();
                 synth.dispose();
             }
-
-            // 根據選擇的樂器種類設定合成器參數 (模擬真實樂器聽感)
-            switch(type) {
-                case 'piano':
-                    synth = new Tone.PolySynth(Tone.Synth, {
-                        oscillator: { type: "fmsine", modulationIndex: 1, harmonicity: 2 },
-                        envelope: { attack: 0.01, decay: 0.1, sustain: 0.4, release: 1.2 }
-                    });
-                    break;
-                case 'plucked':
-                    // 撥弦樂器：起音極快，沒有延音，釋音自然消失
-                    synth = new Tone.PolySynth(Tone.Synth, {
-                        oscillator: { type: "triangle" },
-                        envelope: { attack: 0.005, decay: 1.5, sustain: 0, release: 0.2 }
-                    });
-                    break;
-                case 'bowed':
-                    // 弓弦樂器：起音慢 (拉弓)，延音滿，釋音長
-                    synth = new Tone.PolySynth(Tone.Synth, {
-                        oscillator: { type: "sawtooth" },
-                        envelope: { attack: 0.4, decay: 0.2, sustain: 0.8, release: 1.5 }
-                    });
-                    break;
-                case 'symphonic':
-                    // 交響弦樂：多重鋸齒波 (Fat Oscillator) 增加交響樂的厚度與群體感
-                    synth = new Tone.PolySynth(Tone.Synth, {
-                        oscillator: { type: "fatsawtooth", count: 3, spread: 30 },
-                        envelope: { attack: 0.6, decay: 0.3, sustain: 1.0, release: 2.0 }
-                    });
-                    break;
+            if (filter) {
+                filter.dispose();
             }
+
+            // 取得預設參數，如果找不到就退回 1 號原聲鋼琴
+            const preset = instrumentPresets[type] || instrumentPresets['1'];
+
+            // 設定低通濾波器
+            filter = new Tone.Filter({
+                type: "lowpass",
+                frequency: preset.filter,
+                rolloff: -24
+            });
+
+            // 設定多重合成器
+            synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { 
+                    type: preset.osc,
+                    // 如果是 fat 類型的波形，加入多重振盪器厚度
+                    count: preset.osc.includes('fat') ? 3 : undefined,
+                    spread: preset.osc.includes('fat') ? 20 : undefined
+                },
+                envelope: preset.env
+            });
 
             if (!reverb) {
-                reverb = new Tone.Reverb(2.5).toDestination();
-                masterVol = new Tone.Volume(-5).connect(reverb); // 降低總音量，避免雙手彈奏過多音符時爆音
+                reverb = new Tone.Reverb(3.0).toDestination(); 
+                masterVol = new Tone.Volume(-2).connect(reverb); 
             }
-            synth.connect(masterVol);
+            
+            // 改變聲音傳遞路徑：合成器 -> 濾波器 -> 總音量 -> 殘響 -> 輸出
+            synth.chain(filter, masterVol);
         }
 
         // 改變樂器音色
@@ -360,6 +511,9 @@
                     
                     // 獲取食指指尖 (Index Finger Tip -> 節點 8)
                     const indexFingerTip = hand[8];
+                    
+                    // 加入安全檢查，避免 MediaPipe 偶爾回傳不完整的陣列資料
+                    if (!indexFingerTip || typeof indexFingerTip.x === 'undefined') continue;
                     
                     // 因為畫面翻轉了，X 座標需要 1 - x
                     const px = (1 - indexFingerTip.x) * canvasElement.width;
