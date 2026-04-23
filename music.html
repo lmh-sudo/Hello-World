@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手勢音樂演奏器</title>
+    <!-- Tailwind CSS for UI styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for Audio -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- MediaPipe for Hand Tracking -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #111; font-family: sans-serif; }
+        #output_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+        #ui_layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass through to canvas if needed */
+        }
+        .interactive {
+            pointer-events: auto;
+        }
+        /* Loader animation */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 啟動畫面 (需要用戶點擊才能播放聲音，這是瀏覽器音頻的限制) -->
+    <div id="startScreen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gray-900 text-white">
+        <h1 class="text-4xl font-bold mb-4 text-blue-400">👋 手勢音樂演奏器</h1>
+        <p class="mb-8 text-gray-300 max-w-lg text-center leading-relaxed">
+            這是一個專為不會樂器的人設計的工具。<br>
+            系統會開啟您的視訊鏡頭，請使用<b>雙手的食指</b>在畫面中移動。<br><br>
+            🟠 <b>左側圓盤 (根音)</b>：C, D, E, F, G, A, B<br>
+            🔵 <b>右側圓盤 (性質)</b>：maj, m, maj7, m7, 7, dim, aug, sus4<br>
+            ⚫ <b>圓心區域</b>：靜音區 (不會發出聲音)<br><br>
+            💡 <b>進階玩法</b>：左手選擇根音，右手選擇性質！例如左手放在 <b>A</b>，右手放在 <b>m</b>，就會彈奏 <b>Am</b> 和弦。如果右手沒有選，預設為大調。
+        </p>
+        <button id="startBtn" class="px-8 py-3 bg-blue-600 hover:bg-blue-500 rounded-full text-xl font-bold transition shadow-lg shadow-blue-500/50 interactive">
+            開啟攝影機並開始 / Start
+        </button>
+        <div id="loadingMsg" class="hidden flex-col items-center mt-6">
+            <div class="loader mb-2"></div>
+            <p class="text-blue-300">正在加載 AI 模型與啟動相機...</p>
+        </div>
+        <div id="errorBox" class="hidden text-red-400 mt-4 bg-red-900/50 border border-red-500 p-4 rounded-lg max-w-lg text-center"></div>
+    </div>
+
+    <!-- 降級模式提示 -->
+    <div id="fallbackBadge" class="hidden absolute top-4 left-1/2 -translate-x-1/2 bg-yellow-600/90 text-white px-6 py-2 rounded-full font-bold z-20 shadow-lg pointer-events-none">
+        滑鼠 / 觸控模式 (未偵測到攝影機)
+    </div>
+
+    <!-- UI 控制層 -->
+    <div id="ui_layer" class="p-4 flex justify-between items-start hidden">
+        <div class="bg-black/60 p-4 rounded-xl backdrop-blur-md border border-gray-700 interactive shadow-xl">
+            <label for="instrumentSelect" class="text-white font-bold mr-2">選擇樂器音色：</label>
+            <select id="instrumentSelect" class="bg-gray-800 text-white border border-gray-600 rounded p-2 focus:outline-none focus:border-blue-400">
+                <option value="piano">鋼琴 (Piano)</option>
+                <option value="plucked">撥弦樂器 (吉他/豎琴)</option>
+                <option value="bowed">弓弦樂器 (小提琴/大提琴)</option>
+                <option value="symphonic">交響弦樂庫 (Symphonic Strings)</option>
+            </select>
+        </div>
+        <div class="bg-black/60 p-4 rounded-xl backdrop-blur-md border border-gray-700 text-white font-mono text-xl">
+            當前和弦: <span id="currentChordDisplay" class="text-blue-400 font-bold">無</span>
+        </div>
+    </div>
+
+    <!-- 隱藏的原始攝影機畫面 -->
+    <video id="input_video" class="hidden" autoplay playsinline></video>
+    
+    <!-- 主要繪圖區域 -->
+    <canvas id="output_canvas"></canvas>
+
+    <script>
+        // === 1. 音樂與和弦設定 (Tone.js) ===
+        
+        // 定義音符與 MIDI 轉換基礎
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const rootMap = { "C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11 };
+        
+        // 左側圓盤：根音
+        const roots = [
+            { name: "C" }, { name: "D" }, { name: "E" }, { name: "F" }, 
+            { name: "G" }, { name: "A" }, { name: "B" }
+        ];
+
+        // 右側圓盤：和弦性質與音程組合 (相對於根音的半音距離)
+        const qualities = [
+            { name: "maj", intervals: [0, 4, 7], suffix: "" },        // 大調
+            { name: "m", intervals: [0, 3, 7], suffix: "m" },         // 小調
+            { name: "maj7", intervals: [0, 4, 7, 11], suffix: "maj7" },// 大七
+            { name: "m7", intervals: [0, 3, 7, 10], suffix: "m7" },   // 小七
+            { name: "7", intervals: [0, 4, 7, 10], suffix: "7" },     // 屬七
+            { name: "dim", intervals: [0, 3, 6], suffix: "dim" },     // 減和弦
+            { name: "aug", intervals: [0, 4, 8], suffix: "aug" },     // 增和弦
+            { name: "sus4", intervals: [0, 5, 7], suffix: "sus4" }    // 掛留四
+        ];
+
+        // 產生和弦的具體音符陣列
+        function getChordNotes(rootName, qualityIntervals) {
+            let baseIndex = rootMap[rootName];
+            let baseOctave = 4; // 預設第 4 個八度
+            return qualityIntervals.map(interval => {
+                let totalIndex = baseIndex + interval;
+                let noteName = noteNames[totalIndex % 12];
+                let octave = baseOctave + Math.floor(totalIndex / 12);
+                return noteName + octave;
+            });
+        }
+
+        let synth;
+        let reverb;
+        let masterVol;
+        let currentPlayingNotes = [];
+        let currentChordNames = [];
+
+        // 初始化合成器
+        function initAudio(type = 'piano') {
+            if (synth) {
+                synth.releaseAll();
+                synth.dispose();
+            }
+
+            // 根據選擇的樂器種類設定合成器參數 (模擬真實樂器聽感)
+            switch(type) {
+                case 'piano':
+                    synth = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: "fmsine", modulationIndex: 1, harmonicity: 2 },
+                        envelope: { attack: 0.01, decay: 0.1, sustain: 0.4, release: 1.2 }
+                    });
+                    break;
+                case 'plucked':
+                    // 撥弦樂器：起音極快，沒有延音，釋音自然消失
+                    synth = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: "triangle" },
+                        envelope: { attack: 0.005, decay: 1.5, sustain: 0, release: 0.2 }
+                    });
+                    break;
+                case 'bowed':
+                    // 弓弦樂器：起音慢 (拉弓)，延音滿，釋音長
+                    synth = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: "sawtooth" },
+                        envelope: { attack: 0.4, decay: 0.2, sustain: 0.8, release: 1.5 }
+                    });
+                    break;
+                case 'symphonic':
+                    // 交響弦樂：多重鋸齒波 (Fat Oscillator) 增加交響樂的厚度與群體感
+                    synth = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: "fatsawtooth", count: 3, spread: 30 },
+                        envelope: { attack: 0.6, decay: 0.3, sustain: 1.0, release: 2.0 }
+                    });
+                    break;
+            }
+
+            if (!reverb) {
+                reverb = new Tone.Reverb(2.5).toDestination();
+                masterVol = new Tone.Volume(-5).connect(reverb); // 降低總音量，避免雙手彈奏過多音符時爆音
+            }
+            synth.connect(masterVol);
+        }
+
+        // 改變樂器音色
+        document.getElementById('instrumentSelect').addEventListener('change', (e) => {
+            initAudio(e.target.value);
+            // 重新觸發當前音符以套用新音色
+            if (currentPlayingNotes.length > 0) {
+                synth.triggerAttack(currentPlayingNotes);
+            }
+        });
+
+        // 播放多重音符與和弦邏輯 (支援雙手聯集)
+        function updateNotes(desiredNotes, desiredChordNames) {
+            if (Tone.context.state !== 'running') {
+                Tone.context.resume();
+            }
+
+            // 找出需要停止的音符 (當前在播放，但已經不在雙手目標陣列中)
+            let notesToRelease = currentPlayingNotes.filter(n => !desiredNotes.includes(n));
+            // 找出需要播放的新音符 (在新的目標陣列中，但當前還沒開始播放)
+            let notesToAttack = desiredNotes.filter(n => !currentPlayingNotes.includes(n));
+
+            if (notesToRelease.length > 0) synth.triggerRelease(notesToRelease);
+            if (notesToAttack.length > 0) synth.triggerAttack(notesToAttack);
+
+            currentPlayingNotes = desiredNotes;
+            currentChordNames = desiredChordNames;
+
+            const displayStr = desiredChordNames.length > 0 ? desiredChordNames.join(" + ") : "無 (靜音)";
+            document.getElementById('currentChordDisplay').innerText = displayStr;
+        }
+
+        // 停止和弦
+        function stopChord() {
+            updateNotes([], []);
+        }
+
+
+        // === 2. 視覺與手勢邏輯 (MediaPipe + Canvas) ===
+
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const startScreen = document.getElementById('startScreen');
+        const uiLayer = document.getElementById('ui_layer');
+        const loadingMsg = document.getElementById('loadingMsg');
+
+        // 響應式調整 Canvas 大小
+        function resizeCanvas() {
+            canvasElement.width = window.innerWidth;
+            canvasElement.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 繪製圓盤與扇形區域的函數
+        function drawChordCircle(cx, cy, outerRadius, innerRadius, itemsList, activeIndicesSet, baseColorStr) {
+            const numSectors = itemsList.length;
+            const angleStep = (2 * Math.PI) / numSectors;
+            
+            // 旋轉 -90 度，讓第一個在正上方
+            const offsetAngle = -Math.PI / 2;
+
+            for (let i = 0; i < numSectors; i++) {
+                const startAngle = offsetAngle + i * angleStep;
+                const endAngle = startAngle + angleStep;
+                const isHovered = activeIndicesSet.has(i);
+
+                canvasCtx.beginPath();
+                canvasCtx.arc(cx, cy, outerRadius, startAngle, endAngle);
+                canvasCtx.arc(cx, cy, innerRadius, endAngle, startAngle, true);
+                canvasCtx.closePath();
+
+                // 扇形填充顏色
+                if (isHovered) {
+                    canvasCtx.fillStyle = `rgba(59, 130, 246, 0.7)`; // 亮藍色 (Active)
+                } else {
+                    canvasCtx.fillStyle = baseColorStr; 
+                }
+                canvasCtx.fill();
+                
+                // 扇形邊框
+                canvasCtx.lineWidth = 2;
+                canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                canvasCtx.stroke();
+
+                // 繪製文字
+                const textAngle = startAngle + angleStep / 2;
+                const textRadius = innerRadius + (outerRadius - innerRadius) / 2;
+                const tx = cx + Math.cos(textAngle) * textRadius;
+                const ty = cy + Math.sin(textAngle) * textRadius;
+
+                canvasCtx.fillStyle = isHovered ? '#fff' : 'rgba(255, 255, 255, 0.8)';
+                canvasCtx.font = 'bold 24px sans-serif';
+                canvasCtx.textAlign = 'center';
+                canvasCtx.textBaseline = 'middle';
+                canvasCtx.fillText(itemsList[i].name, tx, ty);
+            }
+
+            // 繪製中心靜音區
+            canvasCtx.beginPath();
+            canvasCtx.arc(cx, cy, innerRadius, 0, 2 * Math.PI);
+            canvasCtx.fillStyle = 'rgba(30, 30, 30, 0.8)';
+            canvasCtx.fill();
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            canvasCtx.stroke();
+            
+            canvasCtx.fillStyle = '#888';
+            canvasCtx.font = '14px sans-serif';
+            canvasCtx.fillText("靜音", cx, cy);
+        }
+
+        // 計算點在哪個扇形區間
+        function getChordIndexFromPosition(px, py, cx, cy, numSectors) {
+            let angle = Math.atan2(py - cy, px - cx);
+            // 補償前面繪圖時的 -90度偏移
+            angle -= (-Math.PI / 2);
+            // 正規化角度到 0 ~ 2π 之間
+            if (angle < 0) angle += 2 * Math.PI;
+            
+            const index = Math.floor((angle / (2 * Math.PI)) * numSectors) % numSectors;
+            return index;
+        }
+
+        // MediaPipe 回調函數 (每一幀執行)
+        function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            if (results.image) {
+                // 1. 繪製攝影機畫面 (水平翻轉使其像鏡子一樣)
+                canvasCtx.translate(canvasElement.width, 0);
+                canvasCtx.scale(-1, 1);
+                // 為了讓畫面填滿或置中，這裡簡單拉伸至全螢幕
+                canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+                
+                // 恢復坐標系以繪製 UI，UI 的 X 座標也要計算翻轉過來的效果
+                canvasCtx.restore();
+
+                // 加上一層半透明黑色遮罩，讓圓盤和圖形更清楚
+                canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+            } else {
+                // 如果沒有攝影機畫面 (滑鼠降級模式)
+                canvasCtx.restore();
+                canvasCtx.fillStyle = '#1a1a2e';
+                canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+                canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                canvasCtx.font = '20px sans-serif';
+                canvasCtx.textAlign = 'center';
+                canvasCtx.fillText('請移動滑鼠或在螢幕上滑動來演奏 (支援雙指)', canvasElement.width / 2, canvasElement.height * 0.1);
+            }
+
+            // 2. 定義左右圓盤的位置與大小
+            const leftCx = canvasElement.width * 0.25;
+            const rightCx = canvasElement.width * 0.75;
+            const cy = canvasElement.height * 0.55; // 稍微偏下留出頂部選單空間
+            const outerRadius = Math.min(canvasElement.width, canvasElement.height) * 0.35;
+            const innerRadius = outerRadius * 0.3;
+
+            let activeLeftIndices = new Set();
+            let activeRightIndices = new Set();
+            let desiredNotes = [];
+            let desiredChordNames = [];
+
+            // 3. 處理手部追蹤數據 (支援雙手)
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+                    const hand = results.multiHandLandmarks[i];
+                    
+                    // 獲取食指指尖 (Index Finger Tip -> 節點 8)
+                    const indexFingerTip = hand[8];
+                    
+                    // 因為畫面翻轉了，X 座標需要 1 - x
+                    const px = (1 - indexFingerTip.x) * canvasElement.width;
+                    const py = indexFingerTip.y * canvasElement.height;
+
+                    // 畫出食指的位置指示器
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(px, py, 15, 0, 2 * Math.PI);
+                    // 為了分辨雙手，第一手畫琥珀色，第二手畫粉紅色
+                    canvasCtx.fillStyle = i === 0 ? '#fbbf24' : '#ec4899'; 
+                    canvasCtx.fill();
+                    canvasCtx.lineWidth = 3;
+                    canvasCtx.strokeStyle = '#fff';
+                    canvasCtx.stroke();
+                    
+                    // 畫光暈
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(px, py, 30, 0, 2 * Math.PI);
+                    canvasCtx.fillStyle = i === 0 ? 'rgba(251, 191, 36, 0.3)' : 'rgba(236, 72, 153, 0.3)';
+                    canvasCtx.fill();
+
+                    // 計算與左圓心的距離
+                    const distLeft = Math.hypot(px - leftCx, py - cy);
+                    // 計算與右圓心的距離
+                    const distRight = Math.hypot(px - rightCx, py - cy);
+
+                    // 判斷是否在左側大調圓盤 (根音)
+                    if (distLeft <= outerRadius && distLeft > innerRadius) {
+                        let idx = getChordIndexFromPosition(px, py, leftCx, cy, roots.length);
+                        activeLeftIndices.add(idx);
+                    } 
+                    // 判斷是否在右側小調圓盤 (性質)
+                    else if (distRight <= outerRadius && distRight > innerRadius) {
+                        let idx = getChordIndexFromPosition(px, py, rightCx, cy, qualities.length);
+                        activeRightIndices.add(idx);
+                    }
+                }
+            }
+
+            // 組合根音與性質
+            // 如果至少選了一個根音 (必須有根音才會發聲)
+            if (activeLeftIndices.size > 0) {
+                activeLeftIndices.forEach(rootIdx => {
+                    let rName = roots[rootIdx].name;
+                    
+                    // 如果有選擇和弦性質，就組合出來
+                    if (activeRightIndices.size > 0) {
+                        activeRightIndices.forEach(qIdx => {
+                            let q = qualities[qIdx];
+                            desiredNotes.push(...getChordNotes(rName, q.intervals));
+                            desiredChordNames.push(rName + q.suffix);
+                        });
+                    } else {
+                        // 如果右手沒有選擇性質 (或在靜音區)，預設為大調 (maj)
+                        let q = qualities[0]; // 'maj' 位於 index 0
+                        desiredNotes.push(...getChordNotes(rName, q.intervals));
+                        desiredChordNames.push(rName + q.suffix);
+                    }
+                });
+            }
+
+            // 去除重複的音符與和弦名 (例如兩隻手指都放在相同區塊上)
+            desiredNotes = [...new Set(desiredNotes)];
+            desiredChordNames = [...new Set(desiredChordNames)];
+
+            // 4. 更新聲音
+            updateNotes(desiredNotes, desiredChordNames);
+
+            // 5. 繪製左右兩個圓盤
+            // 左側根音區：橘色系
+            drawChordCircle(leftCx, cy, outerRadius, innerRadius, roots, activeLeftIndices, 'rgba(234, 88, 12, 0.5)');
+            // 右側性質區：藍綠色系
+            drawChordCircle(rightCx, cy, outerRadius, innerRadius, qualities, activeRightIndices, 'rgba(13, 148, 136, 0.5)');
+
+            // 繪製標題提示
+            canvasCtx.fillStyle = '#fff';
+            canvasCtx.font = 'bold 28px sans-serif';
+            canvasCtx.textAlign = 'center';
+            canvasCtx.fillText("根音選擇 (Roots)", leftCx, cy - outerRadius - 30);
+            canvasCtx.fillText("和弦性質 (Qualities)", rightCx, cy - outerRadius - 30);
+        }
+
+        // === 3. 系統初始化與啟動 ===
+
+        const hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }});
+
+        hands.setOptions({
+            maxNumHands: 2, // 支援雙手同時演奏
+            modelComplexity: 1,
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
+        });
+
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({image: videoElement});
+            },
+            width: 1280,
+            height: 720
+        });
+
+        // --- 滑鼠/觸控降級模式 ---
+        function enableMouseFallback() {
+            document.getElementById('fallbackBadge').classList.remove('hidden');
+            
+            let activePointers = []; // 支援多點觸控
+
+            canvasElement.addEventListener('mousemove', (e) => {
+                activePointers = [{ x: e.clientX / canvasElement.width, y: e.clientY / canvasElement.height }];
+            });
+
+            canvasElement.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                activePointers = [];
+                // 最多支援讀取兩隻手指
+                for(let i=0; i < Math.min(e.touches.length, 2); i++) {
+                    activePointers.push({
+                        x: e.touches[i].clientX / canvasElement.width,
+                        y: e.touches[i].clientY / canvasElement.height
+                    });
+                }
+            }, {passive: false});
+
+            canvasElement.addEventListener('touchend', (e) => {
+                activePointers = [];
+                for(let i=0; i < Math.min(e.touches.length, 2); i++) {
+                    activePointers.push({
+                        x: e.touches[i].clientX / canvasElement.width,
+                        y: e.touches[i].clientY / canvasElement.height
+                    });
+                }
+            });
+
+            canvasElement.addEventListener('mouseleave', () => { activePointers = []; });
+
+            function fallbackLoop() {
+                let multiHandLandmarks = [];
+                
+                activePointers.forEach(pt => {
+                    const mockHand = [];
+                    for(let i=0; i<=8; i++) mockHand.push({x:0, y:0}); 
+                    // 因為畫面原本有鏡像反轉 X，這裡模擬需要反轉回來 1-X
+                    mockHand[8] = { x: 1 - pt.x, y: pt.y };
+                    multiHandLandmarks.push(mockHand);
+                });
+
+                const mockResults = {
+                    image: null,
+                    multiHandLandmarks: multiHandLandmarks
+                };
+                
+                onResults(mockResults);
+                requestAnimationFrame(fallbackLoop);
+            }
+            fallbackLoop();
+        }
+
+        startBtn.addEventListener('click', async () => {
+            startBtn.classList.add('hidden');
+            loadingMsg.classList.remove('hidden');
+            loadingMsg.classList.add('flex');
+            document.getElementById('errorBox').classList.add('hidden');
+
+            try {
+                // 初始化 Web Audio API (必須在使用者點擊事件中執行)
+                await Tone.start();
+                initAudio();
+
+                try {
+                    // 嘗試啟動攝影機
+                    await camera.start();
+                } catch (camErr) {
+                    console.warn("攝影機啟動失敗，切換至滑鼠/觸控模式:", camErr);
+                    // 如果攝影機失敗，啟動滑鼠/觸控備用方案
+                    enableMouseFallback();
+                }
+                
+                // 隱藏啟動畫面，顯示 UI
+                startScreen.style.opacity = '0';
+                setTimeout(() => {
+                    startScreen.style.display = 'none';
+                    uiLayer.classList.remove('hidden');
+                }, 500);
+
+            } catch (error) {
+                console.error("系統啟動失敗:", error);
+                const errorBox = document.getElementById('errorBox');
+                errorBox.innerText = "啟動發生錯誤：" + error.message;
+                errorBox.classList.remove('hidden');
+                
+                startBtn.classList.remove('hidden');
+                loadingMsg.classList.add('hidden');
+                loadingMsg.classList.remove('flex');
+            }
+        });
+
+    </script>
+</body>
+</html>
