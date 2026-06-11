@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>北宋刻字坊：活字印刷大挑戰</title>
+    <style>
+        :root {
+            --bg-color: #3b2a1a;
+            --paper-color: #f4e4bc;
+            --wood-dark: #4a3219;
+            --wood-light: #8b5a2b;
+            --ink-color: #222;
+            --border-color: #2c1a0c;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: "KaiTi", "楷体", "PMingLiU", "新細明體", serif;
+            background-color: var(--bg-color);
+            background-image: repeating-linear-gradient(45deg, #3b2a1a 0px, #3b2a1a 10px, #352516 10px, #352516 20px);
+            margin: 0;
+            padding: 0;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        header {
+            text-align: center;
+            padding: 10px;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            margin: 0;
+            color: #e8ca88;
+            text-shadow: 2px 2px 4px #000;
+            font-size: 26px;
+            letter-spacing: 2px;
+        }
+
+        #game-container {
+            width: 95%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: relative;
+        }
+
+        /* Top: Target Paper */
+        #target-area {
+            background-color: var(--paper-color);
+            background-image: radial-gradient(circle, transparent 20%, #e2ce9d 120%);
+            padding: 30px 10px 20px 10px;
+            border-radius: 4px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1), 2px 2px 8px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        #target-area::before {
+            content: "【目標印刷宣紙】(需印出以下詩句)";
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            color: #886030;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .grid-5 {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .paper-slot {
+            aspect-ratio: 1;
+            border: 1px dashed rgba(136, 96, 48, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            color: var(--ink-color);
+            opacity: 0.2;
+        }
+
+        /* Middle: Tray Area */
+        #tray-area {
+            background: var(--wood-dark);
+            padding: 30px 15px 20px 15px;
+            border-radius: 8px;
+            border: 4px solid var(--border-color);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            position: relative;
+            min-height: 120px;
+        }
+        #tray-area::before {
+            content: "【活字撿字盤】(拖曳字模到下方鐵板)";
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--wood-light);
+            padding: 4px 15px;
+            border-radius: 4px;
+            border: 2px solid var(--border-color);
+            font-size: 14px;
+            color: #fff;
+            white-space: nowrap;
+            z-index: 2;
+        }
+
+        .tray-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        /* Bottom: Board Area */
+        #board-area {
+            background: #2a2a2a;
+            background-image: repeating-linear-gradient(90deg, transparent, transparent 30px, rgba(255,255,255,0.03) 30px, rgba(255,255,255,0.03) 32px);
+            padding: 30px 10px 20px 10px;
+            border-radius: 4px;
+            border: 6px solid #1a1a1a;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.9);
+            position: relative;
+        }
+        #board-area::before {
+            content: "【排版鐵板】(拖曳排版，點擊字模可順時針旋轉)";
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #444;
+            padding: 4px 15px;
+            border-radius: 4px;
+            border: 2px solid #111;
+            font-size: 14px;
+            color: #ffd700;
+            white-space: nowrap;
+        }
+
+        .iron-slot {
+            aspect-ratio: 1;
+            border: 2px dashed #666;
+            background: #222;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Stamp Blocks */
+        .block {
+            width: 50px;
+            height: 50px;
+            background: var(--wood-light);
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 2px 2px 0px #301f11;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            touch-action: none;
+            position: relative;
+            z-index: 5;
+        }
+        .block:active {
+            cursor: grabbing;
+        }
+        
+        .block-char {
+            font-size: 32px;
+            color: #3b2311;
+            text-shadow: 1px 1px 0px #b57a44, -1px -1px 0px #5c371b;
+            font-weight: bold;
+            display: inline-block;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+            margin-bottom: 30px;
+        }
+        button.btn-primary {
+            background: linear-gradient(to bottom, #d33, #a00);
+            color: white;
+            border: 2px solid #500;
+            padding: 12px 35px;
+            font-size: 22px;
+            font-family: inherit;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            transition: all 0.2s;
+            text-shadow: 1px 1px 2px #000;
+        }
+        button.btn-primary:hover {
+            background: linear-gradient(to bottom, #f44, #c00);
+        }
+        button.btn-primary:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.5);
+        }
+
+        /* Canvas Overlay */
+        #canvas-wrapper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            background: transparent;
+            max-width: 100%;
+            max-height: 100vh;
+        }
+
+        /* Modal */
+        #modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--paper-color);
+            padding: 25px;
+            border-radius: 8px;
+            border: 4px solid var(--wood-dark);
+            box-shadow: 0 0 30px rgba(0,0,0,0.9);
+            text-align: center;
+            color: var(--ink-color);
+            z-index: 1001;
+            display: none;
+            width: 85%;
+            max-width: 340px;
+        }
+        #modal h2 {
+            margin-top: 0;
+            color: #800;
+            font-size: 24px;
+        }
+        #modal p {
+            font-size: 18px;
+            line-height: 1.5;
+            font-weight: bold;
+        }
+        #modal button {
+            background: var(--wood-dark);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-family: inherit;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>北宋刻字坊：活字印刷大挑戰</h1>
+    </header>
+
+    <div id="game-container">
+        <!-- 上方：目標區 (5個字) -->
+        <div id="target-area">
+            <div class="grid-5" id="target-slots"></div>
+        </div>
+
+        <!-- 中間：撿字盤 (3x5=15個字模) -->
+        <div id="tray-area">
+            <div class="tray-grid" id="tray-grid"></div>
+        </div>
+
+        <!-- 下方：排版鐵板 (5個字) -->
+        <div id="board-area">
+            <div class="grid-5" id="board-slots"></div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-primary" id="btn-print">刷墨印刷！</button>
+        </div>
+    </div>
+
+    <div id="canvas-wrapper">
+        <canvas id="print-canvas" width="600" height="800"></canvas>
+    </div>
+
+    <div id="modal">
+        <h2 id="modal-title">結果</h2>
+        <p id="modal-desc"></p>
+        <button id="modal-btn">繼續</button>
+    </div>
+
+    <script>
+        // 題庫 (5個字一句)
+        const phrasePool = [
+            "床前明月光", "疑是地上霜",
+            "白日依山盡", "黃河入海流",
+            "春眠不覺曉", "處處聞啼鳥",
+            "紅豆生南國", "春來發幾枝",
+            "鋤禾日當午", "汗滴禾下土",
+            "舉頭望明月", "低頭思故鄉",
+            "夜來風雨聲", "花落知多少",
+            "少壯不努力", "老大徒傷悲"
+        ];
+
+        // 判斷是否為視覺上左右對稱的中文字 (包含題庫中會出現的，以及常見字)
+        const symChars = [
+            '日', '山', '白', '黃', '春', '豆', '南', '來', '當', '午', '土', '童', '言',
+            '一', '二', '三', '十', '木', '水', '大', '天', '中', '口', '田', '王', '里',
+            '八', '只', '且', '東', '平', '無', '百', '合', '谷', '文', '父',
+            '交', '公', '六', '共', '其', '具', '典', '幸', '半', '羊', '善', '美', '全',
+            '會', '品', '回', '器', '四', '目', '面', '首', '酉', '甘', '雨', '門', '非',
+            '鼎', '炎', '晶', '森', '出', '車', '工', '干', '士', '甲', '由', '申', '本',
+            '末', '未', '太', '夫', '立', '音', '早', '辛', '小', '少', '央', '米',
+            '光', '不'
+        ];
+
+        let targetWord = [];
+        let trayBlocks = [];
+        let boardBlocks = [];
+        let audioCtx = null;
+
+        // Custom Drag & Drop State
+        let draggedBlockId = null; 
+        let ghostEl = null;
+        let dragOffset = { x: 0, y: 0 };
+        let isDragging = false;
+        let pointerStart = { x: 0, y: 0 };
+
+        const targetSlotsEl = document.getElementById('target-slots');
+        const trayGridEl = document.getElementById('tray-grid');
+        const boardSlotsEl = document.getElementById('board-slots');
+        const btnPrint = document.getElementById('btn-print');
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+        const canvas = document.getElementById('print-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function initGame() {
+            const randomPhrase = phrasePool[Math.floor(Math.random() * phrasePool.length)];
+            targetWord = randomPhrase.split('');
+            boardBlocks = new Array(5).fill(null); 
+            trayBlocks = [];
+            
+            generateBlocks();
+            render();
+        }
+
+        function generateBlocks() {
+            let blockId = 1;
+            const rotOptions = [0, 90, 180, 270];
+
+            targetWord.forEach(char => {
+                // 1. 正確答案：必定鏡像(mirror=true)，旋轉角度隨機
+                const correctRot = rotOptions[Math.floor(Math.random() * rotOptions.length)];
+                trayBlocks.push({ id: blockId++, char: char, mirror: true, rot: correctRot });
+
+                // 2. 錯誤選擇A：沒有鏡像(mirror=false)，沒有旋轉(rot=0)
+                trayBlocks.push({ id: blockId++, char: char, mirror: false, rot: 0 });
+
+                // 3. 錯誤選擇B：沒有鏡像(mirror=false)，有隨機旋轉
+                const wrongRots = [90, 180, 270];
+                const wrongRot = wrongRots[Math.floor(Math.random() * wrongRots.length)];
+                trayBlocks.push({ id: blockId++, char: char, mirror: false, rot: wrongRot });
+            });
+
+            trayBlocks.sort(() => Math.random() - 0.5);
+        }
+
+        function render() {
+            renderTarget();
+            renderTray();
+            renderBoard();
+        }
+
+        function renderTarget() {
+            targetSlotsEl.innerHTML = '';
+            targetWord.forEach(char => {
+                const slot = document.createElement('div');
+                slot.className = 'paper-slot';
+                slot.textContent = char;
+                targetSlotsEl.appendChild(slot);
+            });
+        }
+
+        function renderTray() {
+            trayGridEl.innerHTML = '';
+            trayBlocks.forEach(block => {
+                trayGridEl.appendChild(createBlockElement(block));
+            });
+        }
+
+        function renderBoard() {
+            boardSlotsEl.innerHTML = '';
+            for (let i = 0; i < 5; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'iron-slot';
+                slot.dataset.index = i;
+                
+                if (boardBlocks[i]) {
+                    slot.appendChild(createBlockElement(boardBlocks[i]));
+                }
+                boardSlotsEl.appendChild(slot);
+            }
+        }
+
+        function createBlockElement(block) {
+            const div = document.createElement('div');
+            div.className = 'block';
+            div.dataset.id = block.id;
+            
+            const span = document.createElement('span');
+            span.className = 'block-char';
+            span.style.transform = `rotate(${block.rot}deg) scaleX(${block.mirror ? -1 : 1})`;
+            span.textContent = block.char;
+            
+            div.appendChild(span);
+
+            div.addEventListener('pointerdown', (e) => onPointerDown(e, block.id));
+            return div;
+        }
+
+        function onPointerDown(e, id) {
+            initAudio();
+            if (e.button !== 0 && e.type.startsWith('mouse')) return;
+            
+            draggedBlockId = id;
+            isDragging = false;
+            pointerStart = { x: e.clientX, y: e.clientY };
+
+            const targetEl = e.currentTarget;
+            const rect = targetEl.getBoundingClientRect();
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
+
+            targetEl.setPointerCapture(e.pointerId);
+
+            targetEl.addEventListener('pointermove', onPointerMove);
+            targetEl.addEventListener('pointerup', onPointerUp);
+            targetEl.addEventListener('pointercancel', onPointerUp);
+        }
+
+        function onPointerMove(e) {
+            if (draggedBlockId === null) return;
+
+            if (!isDragging) {
+                if (Math.abs(e.clientX - pointerStart.x) > 5 || Math.abs(e.clientY - pointerStart.y) > 5) {
+                    isDragging = true;
+                    
+                    const originalEl = document.querySelector(`.block[data-id='${draggedBlockId}']`);
+                    if(originalEl) originalEl.style.opacity = '0.3'; 
+                    
+                    ghostEl = originalEl.cloneNode(true);
+                    ghostEl.style.position = 'fixed';
+                    ghostEl.style.zIndex = '1000';
+                    ghostEl.style.opacity = '0.9';
+                    ghostEl.style.pointerEvents = 'none'; 
+                    ghostEl.style.margin = '0';
+                    document.body.appendChild(ghostEl);
+                }
+            }
+
+            if (isDragging && ghostEl) {
+                ghostEl.style.left = (e.clientX - dragOffset.x) + 'px';
+                ghostEl.style.top = (e.clientY - dragOffset.y) + 'px';
+            }
+        }
+
+        function onPointerUp(e) {
+            const targetEl = e.currentTarget;
+            targetEl.releasePointerCapture(e.pointerId);
+            targetEl.removeEventListener('pointermove', onPointerMove);
+            targetEl.removeEventListener('pointerup', onPointerUp);
+            targetEl.removeEventListener('pointercancel', onPointerUp);
+
+            if (ghostEl) {
+                ghostEl.remove();
+                ghostEl = null;
+            }
+
+            if (isDragging) {
+                targetEl.style.opacity = '1';
+                targetEl.style.visibility = 'hidden'; 
+                const dropTarget = document.elementFromPoint(e.clientX, e.clientY);
+                targetEl.style.visibility = 'visible';
+
+                if (dropTarget) {
+                    const slot = dropTarget.closest('.iron-slot');
+                    const tray = dropTarget.closest('#tray-area');
+
+                    if (slot) {
+                        handleDropLogic(draggedBlockId, 'board', parseInt(slot.dataset.index));
+                    } else if (tray) {
+                        handleDropLogic(draggedBlockId, 'tray', null);
+                    }
+                }
+            } else {
+                const locInfo = findBlock(draggedBlockId);
+                if (locInfo && locInfo.location === 'board') {
+                    locInfo.block.rot += 90;
+                    render(); 
+                }
+            }
+
+            isDragging = false;
+            draggedBlockId = null;
+        }
+
+        function findBlock(id) {
+            let index = trayBlocks.findIndex(b => b.id === id);
+            if (index !== -1) return { block: trayBlocks[index], location: 'tray', index };
+            
+            index = boardBlocks.findIndex(b => b && b.id === id);
+            if (index !== -1) return { block: boardBlocks[index], location: 'board', index };
+            
+            return null;
+        }
+
+        function handleDropLogic(id, toLocation, toIndex) {
+            const src = findBlock(id);
+            if (!src) return;
+
+            let block = src.block;
+
+            if (src.location === 'tray') {
+                trayBlocks.splice(src.index, 1);
+            } else {
+                boardBlocks[src.index] = null;
+            }
+
+            if (toLocation === 'tray') {
+                trayBlocks.push(block);
+            } else if (toLocation === 'board') {
+                const existingBlock = boardBlocks[toIndex];
+                if (existingBlock) {
+                    trayBlocks.push(existingBlock);
+                }
+                boardBlocks[toIndex] = block;
+            }
+            render();
+        }
+
+        // --- Canvas 印刷動畫與判定 ---
+        btnPrint.onclick = () => {
+            initAudio();
+            if (boardBlocks.includes(null)) {
+                alert("請拖曳字模，將鐵板上的 5 個排版空位全部填滿！");
+                return;
+            }
+            startPrintAnimation();
+        };
+
+        function startPrintAnimation() {
+            canvasWrapper.style.display = 'flex';
+            
+            const cw = canvas.width;
+            const ch = canvas.height;
+            ctx.clearRect(0, 0, cw, ch);
+
+            let startTime = null;
+            const duration = 4000; 
+
+            function animate(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const progress = timestamp - startTime;
+                const t = Math.min(progress / duration, 1);
+
+                ctx.clearRect(0, 0, cw, ch);
+
+                const paperW = 460;
+                const paperH = 140; 
+                const paperX = ((cw - paperW) / 2)  ;
+                
+                let paperY;
+                if (t < 0.3) {
+                    const ease = t / 0.3;
+                    paperY = -paperH -200 + (ch / 2 + paperH / 2) * ease;
+                } else {
+                    paperY = ch / 2 - paperH / 2 - 200;
+                }
+
+                ctx.fillStyle = '#f4e4bc';
+                ctx.fillRect(paperX, paperY, paperW, paperH);
+                ctx.strokeStyle = '#e2ce9d';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(paperX + 5, paperY + 5, paperW - 10, paperH - 10);
+
+                if (t >= 0.4) {
+                    const inkOpacity = Math.min((t - 0.4) / 0.3, 1);
+                    ctx.fillStyle = `rgba(34, 34, 34, ${inkOpacity})`;
+                    ctx.font = 'bold 50px "KaiTi", "PMingLiU", serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+
+                    const startX = paperX + 70; 
+                    const gapX = 80;            
+                    const y = paperY + 70;      
+                    
+                    boardBlocks.forEach((block, idx) => {
+                        if (!block) return;
+                        
+                        const x = startX + idx * gapX;
+
+                        ctx.save();
+                        ctx.translate(x, y);
+                        
+                        ctx.scale(-1, 1); 
+                        
+                        ctx.rotate((block.rot % 360) * Math.PI / 180);
+                        ctx.scale(block.mirror ? -1 : 1, 1);
+                        
+                        ctx.fillText(block.char, 0, 0);
+                        ctx.restore();
+                    });
+                }
+
+                if (t < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    evaluateResult();
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        function evaluateResult() {
+            let success = true;
+            let feedback = "";
+
+            for (let i = 0; i < 5; i++) {
+                const block = boardBlocks[i];
+                const isSym = symChars.includes(block.char);
+
+                // 條件 1：排版順序正確
+                if (block.char !== targetWord[i]) {
+                    success = false;
+                    feedback = `排版順序或字模選錯了！<br>第 ${i+1} 個字應該要是「${targetWord[i]}」。`;
+                    break;
+                }
+
+                // 條件 2：正反面檢查。如果不是鏡像，且「不是對稱字」，則失敗。
+                // 若是對稱字，則就算沒有鏡像，印出來也是對的，判定過關！
+                if (!block.mirror && !isSym) {
+                    success = false;
+                    feedback = `哎呀！第 ${i+1} 個字「${block.char}」不是鏡像反字。<br>印出來變左右顛倒了，請找找另一個反字字模。`;
+                    break;
+                }
+
+                // 條件 3：旋轉角度檢查
+                if (block.rot % 360 !== 0) {
+                    success = false;
+                    feedback = `第 ${i+1} 個字「${block.char}」角度歪了！<br>請在鐵板上【點擊】它，將它旋轉端正。`;
+                    break;
+                }
+            }
+
+            if (success) {
+                playFirecracker();
+                const modalDesc = document.getElementById('modal-desc');
+                modalDesc.innerHTML = `完美印出：<br>「${targetWord.join('')}」`;
+                showModal("太厲害了！", "下一題", () => {
+                    canvasWrapper.style.display = 'none';
+                    initGame();
+                });
+            } else {
+                const modalDesc = document.getElementById('modal-desc');
+                modalDesc.innerHTML = feedback;
+                showModal("印刷失敗", "修改排版", () => {
+                    canvasWrapper.style.display = 'none';
+                });
+            }
+        }
+
+        function showModal(title, btnText, callback) {
+            document.getElementById('modal-title').innerHTML = title;
+            const modalEl = document.getElementById('modal');
+            const btnEl = document.getElementById('modal-btn');
+            
+            btnEl.textContent = btnText;
+            modalEl.style.display = 'block';
+            
+            btnEl.onclick = () => {
+                modalEl.style.display = 'none';
+                callback();
+            };
+        }
+
+        // --- Web Audio 鞭炮音效 ---
+        function playFirecracker() {
+            if (!audioCtx) return;
+
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const bufferSize = audioCtx.sampleRate * 0.1; 
+                    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let j = 0; j < bufferSize; j++) {
+                        data[j] = Math.random() * 2 - 1; 
+                    }
+                    
+                    const noise = audioCtx.createBufferSource();
+                    noise.buffer = buffer;
+
+                    const filter = audioCtx.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.frequency.value = 800 + Math.random() * 1500;
+
+                    const gain = audioCtx.createGain();
+                    gain.gain.setValueAtTime(1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    noise.start();
+                }, Math.random() * 1000); 
+            }
+        }
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
