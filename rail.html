@@ -1,216 +1,113 @@
 <!DOCTYPE html>
 <html lang="zh-HK">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>良景輕鐵站 實時到站時間看板</title>
   <style>
-    :root {
-      --bg-color: #0f172a;
-      --card-bg: #1e293b;
-      --text-main: #f8fafc;
-      --text-sub: #94a3b8;
-      --accent-yellow: #facc15;
-      --accent-green: #4ade80;
-      --accent-red: #f87171;
-      --border-color: #334155;
-      --accent-blue: #60a5fa;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; padding: 24px; background-color: var(--bg-color);
-      color: var(--text-main);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      height: 100vh; display: flex; flex-direction: column; justify-content: space-between;
-    }
-    header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 16px 28px; background: var(--card-bg);
-      border-radius: 16px; border: 1px solid var(--border-color);
-    }
-    .title-group h1 { margin: 0; font-size: 2.2rem; color: var(--accent-yellow); }
-    #current-time { font-size: 2.8rem; font-weight: 800; font-family: ui-monospace, monospace; }
-    .update-time { color: var(--text-sub); font-size: 0.85rem; margin-top: 6px; text-align: right;}
-    .dashboard-container { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin: 20px 0; flex: 1; min-height: 0; }
-    .lrt-section { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; min-height: 0; }
-    .bus-section { display: flex; flex-direction: column; min-height: 0; }
-    .platform-card {
-      background: var(--card-bg); border-radius: 16px; border: 1px solid var(--border-color);
-      padding: 24px; display: flex; flex-direction: column; min-height: 0;
-    }
-    .bus-card { border-left: 6px solid var(--accent-blue); flex: 1; }
-    .platform-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 2px solid var(--accent-yellow); margin-bottom: 16px; flex-shrink: 0; gap: 8px; flex-wrap: wrap;}
-    .bus-header { border-bottom: 2px solid var(--accent-blue); }
-    .platform-title { font-size: 1.6rem; font-weight: bold; white-space: nowrap; }
-    .platform-badge { background: #334155; color: var(--accent-yellow); padding: 6px 14px; border-radius: 20px; font-size: 0.95rem; font-weight: 600; }
-    .bus-badge { background: #1e3a5f; color: var(--accent-blue); }
-    .train-table { width: 100%; border-collapse: collapse; }
-    .train-table th { text-align: left; color: var(--text-sub); font-size: 1rem; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
-    .train-table td { padding: 16px 0; font-size: 1.3rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    .route-code { font-weight: 800; color: #000; background: var(--accent-yellow); padding: 4px 12px; border-radius: 8px; display: inline-block; min-width: 60px; text-align: center; }
-    .bus-route-code { background: var(--accent-blue); color: #fff; }
-    .dest-name { font-weight: 700; }
-    .eta-time { font-weight: 700; color: var(--accent-green); text-align: right; }
-    .eta-arriving { color: var(--accent-red); animation: pulse 1.2s infinite ease-in-out; }
-    .bus-eta { color: var(--accent-blue); }
-    .no-data { text-align: center; color: var(--text-sub); padding: 30px 0; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-    footer { text-align: center; color: var(--text-sub); font-size: 0.9rem; padding: 8px 0; }
-    .bus-info-note { font-size: 0.8rem; color: var(--text-sub); margin-top: auto; border-top: 1px dashed var(--border-color); padding-top: 8px; text-align: center; }
-    .table-wrapper { flex: 1; overflow-y: auto; min-height: 0; }
+    :root { --bg-color:#0f172a; --card-bg:#1e293b; --text-main:#f8fafc; --text-sub:#94a3b8; --accent-yellow:#facc15; --accent-green:#4ade80; --accent-red:#f87171; --border-color:#334155; --accent-blue:#60a5fa; }
+    *{box-sizing:border-box} body{margin:0;padding:24px;background:var(--bg-color);color:var(--text-main);font-family:system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;justify-content:space-between}
+    header{display:flex;justify-content:space-between;align-items:center;padding:16px 28px;background:var(--card-bg);border-radius:16px;border:1px solid var(--border-color)}
+    .title-group h1{margin:0;font-size:2.2rem;color:var(--accent-yellow)} #current-time{font-size:2.8rem;font-weight:800;font-family:ui-monospace,monospace}
+    .update-time{color:var(--text-sub);font-size:.85rem;margin-top:6px;text-align:right}
+    .dashboard-container{display:grid;grid-template-columns:2fr 1fr;gap:24px;margin:20px 0;flex:1;min-height:0}
+    .lrt-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;min-height:0} .bus-section{display:flex;flex-direction:column;min-height:0}
+    .platform-card{background:var(--card-bg);border-radius:16px;border:1px solid var(--border-color);padding:24px;display:flex;flex-direction:column;min-height:0}
+    .bus-card{border-left:6px solid var(--accent-blue);flex:1}
+    .platform-header{display:flex;justify-content:space-between;align-items:center;padding-bottom:16px;border-bottom:2px solid var(--accent-yellow);margin-bottom:16px;gap:8px;flex-wrap:wrap}
+    .bus-header{border-bottom:2px solid var(--accent-blue)} .platform-title{font-size:1.6rem;font-weight:bold} .platform-badge{background:#334155;color:var(--accent-yellow);padding:6px 14px;border-radius:20px;font-size:.95rem;font-weight:600} .bus-badge{background:#1e3a5f;color:var(--accent-blue)}
+    .train-table{width:100%;border-collapse:collapse} .train-table th{text-align:left;color:var(--text-sub);font-size:1rem;padding-bottom:12px;border-bottom:1px solid var(--border-color)}
+    .train-table td{padding:16px 0;font-size:1.3rem;border-bottom:1px solid rgba(255,255,255,.05)}
+    .route-code{font-weight:800;color:#000;background:var(--accent-yellow);padding:4px 12px;border-radius:8px;min-width:60px;text-align:center;display:inline-block}
+    .bus-route-code{background:var(--accent-blue);color:#fff} .eta-time{font-weight:700;color:var(--accent-green);text-align:right} .eta-arriving{color:var(--accent-red);animation:pulse 1.2s infinite} .bus-eta{color:var(--accent-blue)}
+    .no-data{text-align:center;color:var(--text-sub);padding:30px 0} @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}} footer{text-align:center;color:var(--text-sub);font-size:.9rem;padding:8px 0}
+    .bus-info-note{font-size:.8rem;color:var(--text-sub);margin-top:auto;border-top:1px dashed var(--border-color);padding-top:8px;text-align:center} .table-wrapper{flex:1;overflow-y:auto;min-height:0}
   </style>
 </head>
 <body>
-  <header>
-    <div class="title-group"><h1>良景站 實時到站看板</h1></div>
-    <div class="clock-box">
-      <div id="current-time">00:00:00</div>
-      <div class="update-time">最後更新：<span id="last-update">載入中...</span></div>
-    </div>
-  </header>
-
-  <div class="dashboard-container">
-    <div class="lrt-section">
-      <div class="platform-card">
-        <div class="platform-header"><span class="platform-title">1 號月台</span><span class="platform-badge">往 屯門碼頭 / 三聖 / 兆康</span></div>
-        <div class="table-wrapper"><table class="train-table"><thead><tr><th width="25%">路線</th><th width="45%">目的地</th><th width="30%" style="text-align:right;">預計到達</th></tr></thead><tbody id="platform-1-body"><tr><td colspan="3" class="no-data">正在讀取班次...</td></tr></tbody></table></div>
-      </div>
-      <div class="platform-card">
-        <div class="platform-header"><span class="platform-title">2 號月台</span><span class="platform-badge">往 天水圍 / 元朗</span></div>
-        <div class="table-wrapper"><table class="train-table"><thead><tr><th width="25%">路線</th><th width="45%">目的地</th><th width="30%" style="text-align:right;">預計到達</th></tr></thead><tbody id="platform-2-body"><tr><td colspan="3" class="no-data">正在讀取班次...</td></tr></tbody></table></div>
-      </div>
-    </div>
-
-    <div class="bus-section">
-      <div class="platform-card bus-card">
-        <div class="platform-header bus-header">
-          <span class="platform-title">🚌 B3A - 新圍苑</span>
-          <span class="platform-badge bus-badge">往 深圳灣口岸</span>
-        </div>
-        <div class="table-wrapper">
-          <table class="train-table">
-            <thead><tr><th width="25%">路線</th><th width="45%">目的地</th><th width="30%" style="text-align:right;">預計到達</th></tr></thead>
-            <tbody id="bus-b3a-body"><tr><td colspan="3" class="no-data">正在讀取 B3A 班次...</td></tr></tbody>
-          </table>
-        </div>
-        <div class="bus-info-note">📍 新圍苑站 · 資料來源：城巴開放數據 · 每 10 秒更新</div>
-      </div>
+<header><div class="title-group"><h1>良景站 實時到站看板</h1></div><div class="clock-box"><div id="current-time">00:00:00</div><div class="update-time">最後更新：<span id="last-update">載入中...</span></div></div></header>
+<div class="dashboard-container">
+  <div class="lrt-section">
+    <div class="platform-card"><div class="platform-header"><span class="platform-title">1 號月台</span><span class="platform-badge">往 屯門碼頭 / 三聖 / 兆康</span></div><div class="table-wrapper"><table class="train-table"><thead><tr><th width="25%">路線</th><th width="45%">目的地</th><th width="30%" style="text-align:right">預計到達</th></tr></thead><tbody id="platform-1-body"><tr><td colspan="3" class="no-data">正在讀取班次...</td></tr></tbody></table></div></div>
+    <div class="platform-card"><div class="platform-header"><span class="platform-title">2 號月台</span><span class="platform-badge">往 天水圍 / 元朗</span></div><div class="table-wrapper"><table class="train-table"><thead><tr><th width="25%">路線</th><th width="45%">目的地</th><th width="30%" style="text-align:right">預計到達</th></tr></thead><tbody id="platform-2-body"><tr><td colspan="3" class="no-data">正在讀取班次...</td></tr></tbody></table></div></div>
+  </div>
+  <div class="bus-section">
+    <div class="platform-card bus-card">
+      <div class="platform-header bus-header"><span class="platform-title">🚌 B3A - 新圍苑</span><span class="platform-badge bus-badge">往 深圳灣口岸</span></div>
+      <div class="table-wrapper"><table class="train-table"><thead><tr><th width="25%">路線</th><th width="45%">目的地</th><th width="30%" style="text-align:right">預計到達</th></tr></thead><tbody id="bus-b3a-body"><tr><td colspan="3" class="no-data">正在讀取 B3A 班次...</td></tr></tbody></table></div>
+      <div class="bus-info-note">📍 新圍苑 (田景路) · 城巴數據 · 每10秒更新</div>
     </div>
   </div>
-
-  <footer>資料來源：港鐵公司開放數據 及 城巴開放數據 | 每 10 秒自動更新</footer>
-
+</div>
+<footer>資料來源：港鐵開放數據 及 城巴開放數據 | 每10秒自動更新</footer>
 <script>
 const LEUNG_KING_STATION_ID = 150;
 const LRT_API_URL = `https://rt.data.gov.hk/v1/transport/mtr/lrt/getSchedule?station_id=${LEUNG_KING_STATION_ID}`;
-
 let cachedB3AStopId = null;
 
-function updateClock() {
-  const now = new Date();
-  document.getElementById('current-time').innerText = now.toLocaleTimeString('zh-HK', { hour12: false });
+function updateClock(){ document.getElementById('current-time').innerText = new Date().toLocaleTimeString('zh-HK',{hour12:false}); }
+function renderNoData(tbody,msg){ tbody.innerHTML = `<tr><td colspan="3" class="no-data">${msg}</td></tr>`; }
+function updateLastUpdateTime(){ document.getElementById('last-update').innerText = new Date().toLocaleTimeString('zh-HK',{hour12:false}); }
+
+async function fetchLRTData(){
+  try{
+    const r = await fetch(LRT_API_URL); const d = await r.json();
+    if(d.status===1 && d.platform_list){ renderLRTPlatforms(d.platform_list); updateLastUpdateTime(); }
+    else{ renderNoData(document.getElementById('platform-1-body'),'暫無班次資料 / 已收車'); renderNoData(document.getElementById('platform-2-body'),'暫無班次資料 / 已收車'); }
+  }catch{ renderNoData(document.getElementById('platform-1-body'),'連線失敗'); renderNoData(document.getElementById('platform-2-body'),'連線失敗'); }
 }
-function renderNoData(tbody, message) {
-  tbody.innerHTML = `<tr><td colspan="3" class="no-data">${message}</td></tr>`;
-}
-async function fetchLRTData() {
-  try {
-    const response = await fetch(LRT_API_URL);
-    const data = await response.json();
-    if (data.status === 1 && data.platform_list) {
-      renderLRTPlatforms(data.platform_list);
-      updateLastUpdateTime();
-    } else {
-      renderNoData(document.getElementById('platform-1-body'), '暫無班次資料 / 已收車');
-      renderNoData(document.getElementById('platform-2-body'), '暫無班次資料 / 已收車');
-    }
-  } catch (error) {
-    renderNoData(document.getElementById('platform-1-body'), '連線失敗');
-    renderNoData(document.getElementById('platform-2-body'), '連線失敗');
-  }
-}
-function renderLRTPlatforms(platformList) {
-  const p1Body = document.getElementById('platform-1-body');
-  const p2Body = document.getElementById('platform-2-body');
-  p1Body.innerHTML = ''; p2Body.innerHTML = '';
-  let p1HasData = false, p2HasData = false;
-  platformList.forEach(platform => {
-    const pId = platform.platform_id;
-    const targetBody = (pId === 1) ? p1Body : (pId === 2) ? p2Body : null;
-    if (!targetBody || !platform.route_list) return;
-    platform.route_list.forEach(route => {
-      const tr = document.createElement('tr');
-      let arrivalText = route.time_ch || route.time_en || '--';
-      let isArriving = arrivalText.includes("即將") || arrivalText.includes("Arriving") || arrivalText === "1 分鐘";
-      let timeClass = isArriving ? "eta-time eta-arriving" : "eta-time";
-      tr.innerHTML = `<td><span class="route-code">${route.route_no || '?'}</span></td><td><span class="dest-name">${route.dest_ch || '未知'}</span></td><td class="${timeClass}">${arrivalText}</td>`;
-      targetBody.appendChild(tr);
-      if (pId === 1) p1HasData = true; if (pId === 2) p2HasData = true;
+function renderLRTPlatforms(list){
+  const p1=document.getElementById('platform-1-body'), p2=document.getElementById('platform-2-body'); p1.innerHTML=''; p2.innerHTML='';
+  let h1=false,h2=false;
+  list.forEach(p=>{
+    const tb = p.platform_id===1? p1 : p.platform_id===2? p2 : null;
+    if(!tb||!p.route_list) return;
+    p.route_list.forEach(r=>{
+      const txt = r.time_ch||r.time_en||'--'; const arriving = txt.includes('即將')||txt.includes('Arriving')||txt==='1 分鐘';
+      const tr=document.createElement('tr'); tr.innerHTML=`<td><span class="route-code">${r.route_no}</span></td><td><span class="dest-name">${r.dest_ch}</span></td><td class="${arriving?'eta-time eta-arriving':'eta-time'}">${txt}</td>`;
+      tb.appendChild(tr); if(p.platform_id===1) h1=true; if(p.platform_id===2) h2=true;
     });
   });
-  if (!p1HasData) renderNoData(p1Body, '暫無班次資料 / 已收車');
-  if (!p2HasData) renderNoData(p2Body, '暫無班次資料 / 已收車');
+  if(!h1) renderNoData(p1,'暫無班次資料 / 已收車'); if(!h2) renderNoData(p2,'暫無班次資料 / 已收車');
 }
 
-// ========== 真實 B3A：新圍苑 往 深圳灣 ==========
-async function fetchB3AData() {
-  const busBody = document.getElementById('bus-b3a-body');
-  try {
-    // 1. 取得新圍苑站ID (只做一次)
-    if (!cachedB3AStopId) {
-      const stopRes = await fetch('https://rt.data.gov.hk/v2/transport/citybus/route-stop/CTB/B3A/outbound');
-      const stopData = await stopRes.json();
-      // 根據官方列表，新圍苑係田景路
-      const found = stopData.data.find(s => s.name_tc.includes('新圍苑') || s.name_en.toLowerCase().includes('san wai'));
-      cachedB3AStopId = found ? found.stop : '003454'; // 003454係新圍苑常見ID，找不到就用fallback
+async function fetchB3AData(){
+  const body=document.getElementById('bus-b3a-body');
+  try{
+    if(!cachedB3AStopId){
+      const sr = await fetch('https://rt.data.gov.hk/v2/transport/citybus/route-stop/CTB/B3A/outbound');
+      if(!sr.ok) throw new Error('route-stop API失敗');
+      const sd = await sr.json();
+      const found = sd.data.find(s=> s.name_tc==='新圍苑' || s.name_tc.includes('新圍苑'));
+      if(!found) throw new Error('找不到新圍苑站ID');
+      cachedB3AStopId = found.stop; // 真實ID，例如 002XXX
+      console.log('B3A 新圍苑 stop_id:',cachedB3AStopId);
     }
-
-    // 2. 查真實ETA
-    const etaRes = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${cachedB3AStopId}/B3A`);
-    const etaData = await etaRes.json();
-
-    busBody.innerHTML = '';
-    if (!etaData.data || etaData.data.length === 0) {
-      renderNoData(busBody, '暫無班次 / 已收車');
-      updateLastUpdateTime();
-      return;
-    }
-
-    // 過濾只顯示往深圳灣口岸方向
-    const outboundEtas = etaData.data.filter(e => e.dir === 'O');
-
-    if (outboundEtas.length === 0) {
-      renderNoData(busBody, '暫無往深圳灣班次');
-      return;
-    }
-
-    outboundEtas.slice(0, 3).forEach(item => {
-      if (!item.eta) return;
-      const etaTime = new Date(item.eta);
-      const diffMin = Math.max(0, Math.round((etaTime - new Date()) / 60000));
-      const text = diffMin <= 1 ? '即將到達' : `${diffMin} 分鐘`;
-      const cls = diffMin <= 1 ? 'eta-time eta-arriving' : 'eta-time bus-eta';
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td><span class="route-code bus-route-code">B3A</span></td><td><span class="dest-name">${item.dest_tc}</span></td><td class="${cls}">${text}</td>`;
-      busBody.appendChild(tr);
+    const er = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${cachedB3AStopId}/B3A`);
+    if(!er.ok) throw new Error('eta API失敗');
+    const ed = await er.json();
+    body.innerHTML='';
+    let list = (ed.data||[]).filter(e=> e.dir==='O' && e.eta);
+    // 按時間排序
+    list.sort((a,b)=> new Date(a.eta)-new Date(b.eta));
+    if(list.length===0){ renderNoData(body,'暫無班次 / 已收車'); updateLastUpdateTime(); return; }
+    list.slice(0,3).forEach(item=>{
+      const diff = Math.max(0, Math.round((new Date(item.eta)-new Date())/60000));
+      const txt = diff<=1? '即將到達' : `${diff} 分鐘`;
+      const cls = diff<=1? 'eta-time eta-arriving' : 'eta-time bus-eta';
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td><span class="route-code bus-route-code">B3A</span></td><td><span class="dest-name">${item.dest_tc||'深圳灣口岸'}</span></td><td class="${cls}">${txt}</td>`;
+      body.appendChild(tr);
     });
-
-    if (busBody.innerHTML === '') renderNoData(busBody, '暫無預報');
+    if(body.innerHTML==='') renderNoData(body,'暫無預報');
     updateLastUpdateTime();
-  } catch (e) {
-    console.error('B3A失敗', e);
-    renderNoData(busBody, '連線失敗，請稍後再試');
+  }catch(e){
+    console.error('B3A失敗',e); renderNoData(body,'連線失敗，請稍後再試'); updateLastUpdateTime();
   }
 }
 
-function updateLastUpdateTime() {
-  document.getElementById('last-update').innerText = new Date().toLocaleTimeString('zh-HK', { hour12: false });
-}
-
-setInterval(updateClock, 1000); updateClock();
+setInterval(updateClock,1000); updateClock();
 fetchLRTData(); fetchB3AData();
-setInterval(fetchLRTData, 10000);
-setInterval(fetchB3AData, 10000);
+setInterval(fetchLRTData,10000); setInterval(fetchB3AData,10000);
 </script>
 </body>
 </html>
