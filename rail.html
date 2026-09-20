@@ -42,7 +42,11 @@
 <script>
 const LEUNG_KING_STATION_ID = 150;
 const LRT_API_URL = `https://rt.data.gov.hk/v1/transport/mtr/lrt/getSchedule?station_id=${LEUNG_KING_STATION_ID}`;
-let cachedB3AStopId = null;
+
+// GitHub Pages 版：鎖死新圍苑城巴ID，避免再call route-stop
+// 如果 002xxx 唔得，會自動試另一個ID
+const SAN_WAI_COURT_STOP_IDS = ['002454', '003454', '002257', '003257']; 
+let currentStopIndex = 0;
 
 function updateClock(){ document.getElementById('current-time').innerText = new Date().toLocaleTimeString('zh-HK',{hour12:false}); }
 function renderNoData(tbody,msg){ tbody.innerHTML = `<tr><td colspan="3" class="no-data">${msg}</td></tr>`; }
@@ -50,7 +54,8 @@ function updateLastUpdateTime(){ document.getElementById('last-update').innerTex
 
 async function fetchLRTData(){
   try{
-    const r = await fetch(LRT_API_URL); const d = await r.json();
+    const r = await fetch(LRT_API_URL, {mode:'cors'});
+    const d = await r.json();
     if(d.status===1 && d.platform_list){ renderLRTPlatforms(d.platform_list); updateLastUpdateTime(); }
     else{ renderNoData(document.getElementById('platform-1-body'),'暫無班次資料 / 已收車'); renderNoData(document.getElementById('platform-2-body'),'暫無班次資料 / 已收車'); }
   }catch{ renderNoData(document.getElementById('platform-1-body'),'連線失敗'); renderNoData(document.getElementById('platform-2-body'),'連線失敗'); }
@@ -62,7 +67,7 @@ function renderLRTPlatforms(list){
     const tb = p.platform_id===1? p1 : p.platform_id===2? p2 : null;
     if(!tb||!p.route_list) return;
     p.route_list.forEach(r=>{
-      const txt = r.time_ch||r.time_en||'--'; const arriving = txt.includes('即將')||txt.includes('Arriving')||txt==='1 分鐘';
+      const txt = r.time_ch||r.time_en||'--'; const arriving = txt.includes('即將');
       const tr=document.createElement('tr'); tr.innerHTML=`<td><span class="route-code">${r.route_no}</span></td><td><span class="dest-name">${r.dest_ch}</span></td><td class="${arriving?'eta-time eta-arriving':'eta-time'}">${txt}</td>`;
       tb.appendChild(tr); if(p.platform_id===1) h1=true; if(p.platform_id===2) h2=true;
     });
@@ -72,42 +77,43 @@ function renderLRTPlatforms(list){
 
 async function fetchB3AData(){
   const body=document.getElementById('bus-b3a-body');
-  try{
-    if(!cachedB3AStopId){
-      const sr = await fetch('https://rt.data.gov.hk/v2/transport/citybus/route-stop/CTB/B3A/outbound');
-      if(!sr.ok) throw new Error('route-stop API失敗');
-      const sd = await sr.json();
-      const found = sd.data.find(s=> s.name_tc==='新圍苑' || s.name_tc.includes('新圍苑'));
-      if(!found) throw new Error('找不到新圍苑站ID');
-      cachedB3AStopId = found.stop; // 真實ID，例如 002XXX
-      console.log('B3A 新圍苑 stop_id:',cachedB3AStopId);
-    }
-    const er = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${cachedB3AStopId}/B3A`);
-    if(!er.ok) throw new Error('eta API失敗');
-    const ed = await er.json();
-    body.innerHTML='';
-    let list = (ed.data||[]).filter(e=> e.dir==='O' && e.eta);
-    // 按時間排序
-    list.sort((a,b)=> new Date(a.eta)-new Date(b.eta));
-    if(list.length===0){ renderNoData(body,'暫無班次 / 已收車'); updateLastUpdateTime(); return; }
-    list.slice(0,3).forEach(item=>{
-      const diff = Math.max(0, Math.round((new Date(item.eta)-new Date())/60000));
-      const txt = diff<=1? '即將到達' : `${diff} 分鐘`;
-      const cls = diff<=1? 'eta-time eta-arriving' : 'eta-time bus-eta';
-      const tr=document.createElement('tr');
-      tr.innerHTML=`<td><span class="route-code bus-route-code">B3A</span></td><td><span class="dest-name">${item.dest_tc||'深圳灣口岸'}</span></td><td class="${cls}">${txt}</td>`;
-      body.appendChild(tr);
-    });
-    if(body.innerHTML==='') renderNoData(body,'暫無預報');
-    updateLastUpdateTime();
-  }catch(e){
-    console.error('B3A失敗',e); renderNoData(body,'連線失敗，請稍後再試'); updateLastUpdateTime();
+  for(let i=0; i < SAN_WAI_COURT_STOP_IDS.length; i++){
+    const stopId = SAN_WAI_COURT_STOP_IDS[(currentStopIndex + i) % SAN_WAI_COURT_STOP_IDS.length];
+    try{
+      const url = `https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${stopId}/B3A`;
+      console.log('試緊 B3A stop:', stopId);
+      const r = await fetch(url, {mode:'cors', cache:'no-store'});
+      if(!r.ok) continue;
+      const data = await r.json();
+      if(!data.data || data.data.length===0) continue;
+      
+      let list = data.data.filter(e => e.eta); // 唔再過濾dir，因為有啲站API唔回dir
+      list.sort((a,b)=> new Date(a.eta) - new Date(b.eta));
+      if(list.length===0) continue;
+
+      // 成功搵到，鎖定呢個ID
+      currentStopIndex = (currentStopIndex + i) % SAN_WAI_COURT_STOP_IDS.length;
+      body.innerHTML='';
+      list.slice(0,3).forEach(item=>{
+        const diff = Math.max(0, Math.round((new Date(item.eta)-new Date())/60000));
+        const txt = diff<=1? '即將到達' : `${diff} 分鐘`;
+        const cls = diff<=1? 'eta-time eta-arriving' : 'eta-time bus-eta';
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td><span class="route-code bus-route-code">B3A</span></td><td><span class="dest-name">${item.dest_tc||'深圳灣口岸'}</span></td><td class="${cls}">${txt}</td>`;
+        body.appendChild(tr);
+      });
+      updateLastUpdateTime();
+      return; // 成功就完
+    }catch(e){ console.warn(`stop ${stopId} 失敗`, e); continue; }
   }
+  // 全部ID都失敗，先至顯示最準確嘅debug訊息
+  renderNoData(body, '暫無 B3A 預報 (城巴API未回數據，請F12睇Console)');
+  updateLastUpdateTime();
 }
 
 setInterval(updateClock,1000); updateClock();
 fetchLRTData(); fetchB3AData();
-setInterval(fetchLRTData,10000); setInterval(fetchB3AData,10000);
+setInterval(fetchLRTData,10000); setInterval(fetchB3AData,15000);
 </script>
 </body>
 </html>
